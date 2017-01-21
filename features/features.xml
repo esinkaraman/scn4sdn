@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  ~ Copyright 2014 Open Networking Laboratory
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<features xmlns="http://karaf.apache.org/xmlns/features/v1.2.0"
+          name="scn-@FEATURE-VERSION">
+    <repository>mvn:org.apache.karaf.features/standard/3.0.5/xml/features
+    </repository>
+    <repository>mvn:org.ops4j.pax.jdbc/pax-jdbc-features/0.7.0/xml/features
+    </repository>
+    <!--<repository>mvn:org.ops4j.pax.web/pax-web-features/4.2.7/xml/features</repository>-->
+
+    <feature name="scn-cnt" version="@FEATURE-VERSION"
+             description="Scn controller">
+        <feature>onos-api</feature>
+        <bundle>mvn:scn/scn-controller/@FEATURE-VERSION</bundle>
+    </feature>
+
+    <feature name="scn-cli" version="@FEATURE-VERSION"
+             description="SCN admin command console components">
+        <feature>onos-api</feature>
+        <bundle>mvn:scn/scn-cli/@FEATURE-VERSION</bundle>
+    </feature>
+
+</features>

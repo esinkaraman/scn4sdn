@@ -1,0 +1,18 @@
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0">
+    <command-bundle xmlns="http://karaf.apache.org/xmlns/shell/v1.1.0">
+        <command>
+            <action class="tr.edu.boun.cmpe.scn.cli.ServiceListCommand"/>
+            <!--<completers>
+                <ref component-id="portStatCompleter"/>
+            </completers>-->
+            <!--<optional-completers>
+                <entry key="-t" value-ref="ethTypeCompleter"/>
+                <entry key="&#45;&#45;ipProto" value-ref="ipProtocolCompleter"/>
+                <entry key="&#45;&#45;icmp6Type" value-ref="Icmp6TypeCompleter"/>
+                <entry key="&#45;&#45;icmp6Code" value-ref="Icmp6CodeCompleter"/>
+                <entry key="&#45;&#45;extHdr" value-ref="ExtHeaderCompleter"/>
+                <entry key="-a" value-ref="allAppNameCompleter"/>
+            </optional-completers>-->
+        </command>
+    </command-bundle>
+</blueprint>
