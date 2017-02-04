@@ -19,7 +19,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>tr.edu.boun.cmpe.scn.client.ServiceUpHandler</mainClass>
+                            <mainClass>tr.edu.boun.cmpe.scn.client.Test</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
