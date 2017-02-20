@@ -12,4 +12,32 @@
     <artifactId>scn-controller</artifactId>
     <packaging>bundle</packaging>
 
+    <properties>
+        <onos.app.name>org.onosproject.scn</onos.app.name>
+        <onos.app.title>Service Centric Networking App</onos.app.title>
+        <onos.app.category>Networking</onos.app.category>
+        <onos.app.url>http://onosproject.org</onos.app.url>
+        <onos.app.readme>Service Centric Networking application using flow subsystem.</onos.app.readme>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>scn</groupId>
+            <artifactId>scn-api</artifactId>
+            <version>1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.6.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-app-fwd</artifactId>
+            <version>1.6.0</version>
+        </dependency>
+    </dependencies>
+
 </project>

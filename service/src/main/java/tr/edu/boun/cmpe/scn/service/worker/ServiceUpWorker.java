@@ -28,7 +28,7 @@ public class ServiceUpWorker extends BaseWorker implements Runnable {
         try {
             ServiceUp serviceUp = prepareServiceUp();
             String payload = gson().toJson(serviceUp);
-            byte[] data = payload.getBytes(ScnServer.UTF8);
+            byte[] data = payload.getBytes(Constants.UTF8);
 
             InetAddress destAddress = InetAddress.getByName(Constants.SCN_BROADCAST_ADDRESS);
             int destPort = Constants.SCN_SERVICE_PORT;
@@ -47,8 +47,8 @@ public class ServiceUpWorker extends BaseWorker implements Runnable {
     private ServiceUp prepareServiceUp() {
         ServiceUp sup = new ServiceUp();
         sup.setMessageTypeId(ScnMessageType.UP.getId());
-        sup.setServiceName(ScnServer.SERVICE_NAME);
-        sup.setServicePort(ScnServer.SERVICE_PORT);
+        sup.setServiceName(server.getServiceName());
+        sup.setServicePort(server.getServicePort());
         return sup;
     }
 

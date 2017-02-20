@@ -11,7 +11,7 @@ import java.net.InetAddress;
  */
 public abstract class BaseWorker {
 
-    private ScnServer server;
+    protected ScnServer server;
 
     BaseWorker(ScnServer server) {
         this.server = server;

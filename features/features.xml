@@ -26,12 +26,16 @@
              description="Scn controller">
         <feature>onos-api</feature>
         <bundle>mvn:scn/scn-controller/@FEATURE-VERSION</bundle>
+        <bundle>mvn:com.google.code.gson/gson/2.6.2</bundle>
+        <bundle>mvn:scn/scn-api/@FEATURE-VERSION</bundle>
     </feature>
 
     <feature name="scn-cli" version="@FEATURE-VERSION"
              description="SCN admin command console components">
         <feature>onos-api</feature>
         <bundle>mvn:scn/scn-cli/@FEATURE-VERSION</bundle>
+        <bundle>mvn:com.google.code.gson/gson/2.6.2</bundle>
+        <bundle>mvn:scn/scn-api/@FEATURE-VERSION</bundle>
     </feature>
 
 </features>

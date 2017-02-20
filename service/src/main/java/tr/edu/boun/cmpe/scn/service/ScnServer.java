@@ -1,7 +1,9 @@
 package tr.edu.boun.cmpe.scn.service;
 
 import com.google.gson.Gson;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
 import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
+import tr.edu.boun.cmpe.scn.api.common.Tool;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
@@ -19,6 +21,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,10 +30,8 @@ import java.util.concurrent.Executors;
  */
 public class ScnServer implements Runnable {
 
-    public static final int SERVICE_PORT = 9595;
-    public static final String SERVICE_NAME = "s1";
-    public static final String UTF8 = "UTF-8";
-    public static final String BROADCAST_IP = "255.255.255.255";
+    private String serviceName;
+    private int servicePort;
     //creating a pool of 20 threads
     private ExecutorService executor = Executors.newFixedThreadPool(20);
 
@@ -38,13 +39,18 @@ public class ScnServer implements Runnable {
 
     private DatagramSocket socket;
 
-    public ScnServer() throws SocketException {
-        socket = new DatagramSocket(SERVICE_PORT);
+    public ScnServer(String srcIp, int servicePort, String serviceName) throws SocketException, UnknownHostException {
+        Tool.checkNull(srcIp, "Source IP address can not be null");
+        Tool.checkNull(serviceName, "Service name can not be null");
+        SocketAddress socketAddress = new InetSocketAddress(InetAddress.getByName(srcIp), servicePort);
+        socket = new DatagramSocket(socketAddress);
+        this.servicePort = servicePort;
+        this.serviceName = serviceName;
     }
 
     @Override
     public void run() {
-        System.out.println(SERVICE_NAME + " service started and listening to port " + SERVICE_PORT);
+        System.out.println(serviceName + " service started and listening to port " + servicePort);
         //emit service up first
         executor.submit(new ServiceUpWorker(this));
 
@@ -59,18 +65,19 @@ public class ScnServer implements Runnable {
             }
         }
 
-        System.out.println(SERVICE_NAME + " stopped");
+        System.out.println(serviceName + " stopped");
     }
 
     private DatagramPacket receive() throws IOException {
-        byte[] receiveData = new byte[4096];
+        byte[] receiveData = new byte[Constants.PACKET_SIZE];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         socket.receive(receivePacket);
         return receivePacket;
     }
 
     private ScnMessage getAndProcessData(DatagramPacket packet) throws UnsupportedEncodingException {
-        String data = new String(packet.getData(), UTF8).trim();
+        String data = new String(packet.getData(), Constants.UTF8).trim();
+        System.out.println("-->received: " + data);
         Gson gson = gson();
         ScnMessage scnMessage = gson.fromJson(data.trim(), ScnMessage.class);
 
@@ -112,6 +119,12 @@ public class ScnServer implements Runnable {
         return new Gson();
     }
 
+    public String getServiceName() {
+        return serviceName;
+    }
 
+    public int getServicePort() {
+        return servicePort;
+    }
 }
 

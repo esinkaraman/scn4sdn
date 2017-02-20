@@ -22,6 +22,7 @@
         <xsd:complexContent>
             <xsd:extension base="ScnMessage">
                 <xsd:sequence>
+                    <xsd:element name="messageId" type="xsd:string"/>
                     <xsd:element name="arguments" type="Arguments" minOccurs="0"
                                  maxOccurs="1"/>
                 </xsd:sequence>
@@ -31,7 +32,11 @@
 
     <xsd:complexType name="ServiceData">
         <xsd:complexContent>
-            <xsd:extension base="ScnMessage"></xsd:extension>
+            <xsd:extension base="ScnMessage">
+                <xsd:sequence>
+                    <xsd:element name="messageId" type="xsd:string"/>
+                </xsd:sequence>
+            </xsd:extension>
         </xsd:complexContent>
     </xsd:complexType>
 

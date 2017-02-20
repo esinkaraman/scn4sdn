@@ -9,7 +9,7 @@ import java.net.SocketAddress;
 /**
  * Created by esinka on 1/6/2017.
  */
-public class ServiceUpHandler {
+public class Test {
     public static void main(String[] args) {
         DatagramSocket datagramSocket = null;
         try {
@@ -20,17 +20,17 @@ public class ServiceUpHandler {
             }
             String srcIp = args[0];
             if(srcIp == null) {
-                System.out.println("Source IP must bu given!");
+                System.out.println("Source IP must be given!");
                 return;
             }
             String serviceName = args[1];
             if(serviceName == null) {
-                System.out.println("ServiceName must bu given!");
+                System.out.println("ServiceName must be given!");
                 return;
             }
             String servicePort = args[2];
             if(serviceName == null) {
-                System.out.println("ServicePort must bu given!");
+                System.out.println("ServicePort must be given!");
                 return;
             }
 
@@ -43,6 +43,7 @@ public class ServiceUpHandler {
             DatagramPacket packet = new DatagramPacket(
                     data, data.length, address, dstPort
             );
+
             SocketAddress a = new InetSocketAddress(InetAddress.getByName(srcIp), srcPort);
             datagramSocket = new DatagramSocket(a);
             datagramSocket.send(packet);

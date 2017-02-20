@@ -14,7 +14,7 @@ import tr.edu.boun.cmpe.scn.ServiceInfo;
         description = "Lists all service instances")
 public class ServiceListCommand extends OsgiCommandSupport {
 
-    private static final String FMT = "ServiceName=%s, SwitchId=%s SwitchPort=%s ServıcePort=%s LastActivity=%s %s";
+    private static final String FMT = "ServiceName=%s, SwitchId=%s SwitchPort=%s ServicePort=%s LastActivity=%s %s";
 
     /**
      * Executes this command.

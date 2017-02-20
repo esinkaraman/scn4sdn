@@ -27,6 +27,15 @@ public class Services {
         log.info("Service saved. {}", serviceInfo);
     }
 
+    public ServiceInfo removeInstance(DeviceId deviceId, PortNumber portNumber) {
+        String key = prepareKey(deviceId, portNumber);
+        ServiceInfo removed = serviceMap.remove(key);
+        if (removed != null) {
+            log.info("Service removed. {}", removed);
+        }
+        return removed;
+    }
+
     public Iterable<ServiceInfo> getServices() {
         return Collections.unmodifiableCollection(serviceMap.values());
     }

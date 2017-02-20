@@ -32,6 +32,7 @@ public class ServiceInterestWorker extends BaseWorker implements Runnable {
         ServiceData serviceData = new ServiceData();
         serviceData.setServiceName(interest.getServiceName());
         serviceData.setMessageTypeId(ScnMessageType.DATA.getId());
+        serviceData.setMessageId(interest.getMessageId());
         return serviceData;
     }
 
