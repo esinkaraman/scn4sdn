@@ -10,5 +10,7 @@ import java.io.IOException;
  */
 public interface IScnClient {
 
-    ServiceData sendInterest(ServiceInterest interest, String srcAddress) throws IOException;
+    ServiceData sendAndReceive(ServiceInterest interest) throws IOException;
+    void send(ServiceInterest interest, IScnListener listener) throws IOException;
+    void close();
 }
