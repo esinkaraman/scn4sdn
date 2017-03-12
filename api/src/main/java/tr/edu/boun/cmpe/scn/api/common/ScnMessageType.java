@@ -2,6 +2,7 @@ package tr.edu.boun.cmpe.scn.api.common;
 
 /**
  * Created by esinka on 1/28/2017.
+ *
  */
 public enum ScnMessageType {
     UP(1),

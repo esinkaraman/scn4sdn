@@ -10,4 +10,10 @@ public class Tool {
             throw new IllegalArgumentException(message);
         }
     }
+
+    public static void checkArgument(boolean expressionValue, String message) {
+        if(!expressionValue) {
+            throw new IllegalArgumentException(message);
+        }
+    }
 }
