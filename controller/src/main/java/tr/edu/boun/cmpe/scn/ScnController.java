@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Modified;
+import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
@@ -16,6 +18,8 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.UDP;
+import org.onlab.util.Tools;
+import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -40,24 +44,31 @@ import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
+import org.onosproject.net.packet.DefaultOutboundPacket;
+import org.onosproject.net.packet.OutboundPacket;
 import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.topology.TopologyService;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import tr.edu.boun.cmpe.scn.api.common.Constants;
 import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 import tr.edu.boun.cmpe.scn.api.message.ServiceData;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
+import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
 import tr.edu.boun.cmpe.scn.api.message.ServiceUp;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
+import java.util.Dictionary;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -78,6 +89,10 @@ public class ScnController implements ScnService {
 
     private static final int DEFAULT_PRIORITY = 10;
     private static final int DEFAULT_TIMEOUT = 10;
+    private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 1000;
+    private static final String SENDER_MAC_ADDRESS = "00:00:00:00:00:01";
+
+    private static byte packetTTL = (byte) 127;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
@@ -91,6 +106,18 @@ public class ScnController implements ScnService {
     protected FlowObjectiveService flowObjectiveService;
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleService flowRuleService;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected ComponentConfigService cfgService;
+
+    @Property(name = "probeEnabled", boolValue = true, label = "Enable ServiceProbe emitter; default is false")
+    boolean probeEnabled = true;
+    @Property(name = "probePeriod", intValue = DEFAULT_PROBE_PERIOD_MILLISECONDS, label = "Configure ServiceProbe period in milliseconds; default is 1000 milliseconds")
+    private int probePeriod = DEFAULT_PROBE_PERIOD_MILLISECONDS;
+
+    @Property(name = "macAddress", value = SENDER_MAC_ADDRESS, label = "macAddress value; default is 00:00:00:00:00:01")
+    private String macAddress = SENDER_MAC_ADDRESS;
+    @Property(name = "ipAddress", value = "10.0.0.190", label = "ipAddress value; default is 10.0.0.190")
+    private String ipAddress = "10.0.0.190";
 
     private ApplicationId appId;
     ScnPacketProcessor processor = new ScnPacketProcessor();
@@ -107,30 +134,60 @@ public class ScnController implements ScnService {
     private static final ConcurrentHashMap<String, ServiceInfo> serviceLocationToInstanceMap = new ConcurrentHashMap<>();
 
     @Activate
-    public void activate() {
+    public void activate(ComponentContext context) {
+        cfgService.registerProperties(getClass());
         appId = coreService.registerApplication("org.onosproject.scn");
         packetService.addProcessor(processor, PacketProcessor.director(0));
         requestPackets();
         hostService.addListener(hostListener);
         log.info("ScnHandler activated");
-        scheduler = Executors.newScheduledThreadPool(1);
+        scheduler = Executors.newScheduledThreadPool(2);
+        readComponentConfiguration(context);
 
-        final Runnable pathIdChecker = new Runnable() {
-            public void run() {
-                clearPathIdMap();
-            }
-        };
-
-        scheduler.scheduleAtFixedRate(pathIdChecker, 3, 3, TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(pathIdChecker, (long) 3, (long) 3, TimeUnit.SECONDS);
+        //check service probes per 10 milliseconds
+        scheduler.scheduleWithFixedDelay(probeChecker, (long) 3, (long) 10, TimeUnit.MILLISECONDS);
     }
+
+    final Runnable pathIdChecker = new Runnable() {
+        public void run() {
+            clearPathIdMap();
+        }
+    };
+
+    final Runnable probeChecker = new Runnable() {
+        @Override
+        public void run() {
+            checkProbes();
+        }
+    };
 
     @Deactivate
     protected void deactivate() {
+        cfgService.unregisterProperties(getClass(), false);
         packetService.removeProcessor(processor);
         cancelPackets();
         hostService.removeListener(hostListener);
         scheduler.shutdown();
         log.info("ScnHandler stopped");
+    }
+
+    private void readComponentConfiguration(ComponentContext context) {
+        Dictionary<?, ?> properties = context.getProperties();
+
+        Boolean probeEnabledCfg =
+                Tools.isPropertyEnabled(properties, "probeEnabled");
+        if (probeEnabledCfg == null) {
+            log.info("probeEnabled port is not configured, using current value of {}", probeEnabled);
+        } else {
+            probeEnabled = probeEnabledCfg;
+            log.info("Configured.probeEnabled is {}", probeEnabled ? "enabled" : "disabled");
+        }
+    }
+
+    @Modified
+    public void modified(ComponentContext context) {
+        readComponentConfiguration(context);
     }
 
     /**
@@ -184,9 +241,9 @@ public class ScnController implements ScnService {
         });
         if (!keys.isEmpty()) {
             log.info("FLows will be removed -> {}", keys);
-            for(String key:keys) {
+            for (String key : keys) {
                 SelectorValue removed = pathIds.remove(key);
-                if(removed != null) {
+                if (removed != null) {
                     removeFlowsFromDevices(removed.getFlowRules());
                 }
             }
@@ -249,6 +306,7 @@ public class ScnController implements ScnService {
                             context.block();
                             break;
                         case PROBE:
+                            //TODO
                     }
                 }
             }
@@ -310,6 +368,11 @@ public class ScnController implements ScnService {
         service.setDeviceId(receivedFrom.deviceId().toString());
         service.setDevicePort(receivedFrom.port().toLong());
         service.setHostId(src);
+        if (probeEnabled) {
+            Date expire = DateUtils.dateAddMilliSeconds(probePeriod);
+            service.setProbeExpiresAt(expire.getTime());
+            log.info("ServiceProbe will be send at {}", expire);
+        }
         return service;
     }
 
@@ -369,7 +432,6 @@ public class ScnController implements ScnService {
             log.warn("No path found for service {}", interest.getServiceName());
             return;
         }
-
 
         //sort the list into ascending order considering distance
         Collections.sort(comparableServiceList);
@@ -720,5 +782,55 @@ public class ScnController implements ScnService {
                 }
             }));
         }
+    }
+
+    private void checkProbes() {
+        serviceNameToInstancesMap.values().forEach(services -> {
+            services.getServices().forEach(serviceInfo -> {
+                if (probeEnabled && serviceInfo.getProbeExpiresAt() != null) {
+                    long currentTime = new Date().getTime();
+                    if (exceeds(currentTime, serviceInfo.getProbeExpiresAt())) {
+                        sendServiceProbe(serviceInfo);
+                    }
+                }
+            });
+        });
+    }
+
+    private boolean exceeds(long date1, long date2) {
+        return date1 >= date2;
+    }
+
+    private void sendServiceProbe(ServiceInfo serviceInfo) {
+        log.info("Sending probe to {} at {}:{}", serviceInfo.getName(), serviceInfo.getDeviceId(), serviceInfo.getDevicePort());
+        Host serviceHost = hostService.getHost(serviceInfo.getHostId());
+
+        if (!serviceStillThere(serviceHost.location(), serviceInfo)) {
+            log.warn("Service host location can not be verified. Thus, not send ServiceProbe. {}, Host location={}", serviceInfo, serviceHost.location());
+            return;
+        }
+        //build probe message
+        ServiceProbe serviceProbe = new ServiceProbe();
+        serviceProbe.setMessageTypeId(ScnMessageType.PROBE.getId());
+        serviceProbe.setServiceName(serviceInfo.getName());
+        Ethernet eth = new Ethernet();
+
+        eth.setDestinationMACAddress(serviceHost.mac().toBytes())
+                .setSourceMACAddress(macAddress)
+                .setEtherType(Ethernet.TYPE_IPV4).setPayload(serviceProbe);
+
+        IPv4 iPv4 = new IPv4();
+        iPv4.setSourceAddress(ipAddress);
+        iPv4.setDestinationAddress(serviceHost.ipAddresses().iterator().next().getIp4Address().toInt());
+        iPv4.setTtl(packetTTL);
+        iPv4.setPayload(serviceProbe);
+        eth.setPayload(iPv4);
+
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(serviceHost.location().port()).build();
+        OutboundPacket packet = new DefaultOutboundPacket(serviceHost.location().deviceId(),
+                                                          treatment, ByteBuffer.wrap(eth.serialize()));
+
+        packetService.emit(packet);
+        log.info("ServiceProbe message has been sent to {} at {}", serviceInfo.getName(), serviceHost);
     }
 }

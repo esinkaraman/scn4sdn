@@ -14,6 +14,7 @@ public class ServiceInfo implements Cloneable {
     private long devicePort;
     private HostId hostId;
     private Date lastUpdateTime = new Date();
+    private Long probeExpiresAt;
 
     public String getName() {
         return name;
@@ -63,6 +64,13 @@ public class ServiceInfo implements Cloneable {
         this.hostId = hostId;
     }
 
+    public Long getProbeExpiresAt() {
+        return probeExpiresAt;
+    }
+
+    public void setProbeExpiresAt(Long probeExpiresAt) {
+        this.probeExpiresAt = probeExpiresAt;
+    }
 
     @Override
     public String toString() {
@@ -73,6 +81,7 @@ public class ServiceInfo implements Cloneable {
         sb.append(", devicePort=").append(devicePort);
         sb.append(", hostId=").append(hostId);
         sb.append(", lastUpdateTime=").append(lastUpdateTime);
+        sb.append(", probeExpiresAt=").append(probeExpiresAt);
         sb.append('}');
         return sb.toString();
     }
