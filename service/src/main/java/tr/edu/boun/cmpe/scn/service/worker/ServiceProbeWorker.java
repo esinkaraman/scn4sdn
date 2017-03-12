@@ -1,8 +1,10 @@
 package tr.edu.boun.cmpe.scn.service.worker;
 
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
+import tr.edu.boun.cmpe.scn.service.CpuReader;
 import tr.edu.boun.cmpe.scn.service.ScnServer;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 
 /**
@@ -32,7 +34,17 @@ public class ServiceProbeWorker extends BaseWorker implements Runnable {
      */
     @Override
     public void run() {
-        //reply the probe back
-        reply(message, datagramPacket);
+        try {
+            String cpuTime = CpuReader.getInstance().getCpuTime();
+            if (cpuTime != null) {
+                message.setCpuUsage(cpuTime);
+                //reply the probe back
+                reply(message, datagramPacket);
+            }
+        } catch (IOException e) {
+            System.err.println("Unable to read CPU usage!");
+            e.printStackTrace();
+        }
+
     }
 }

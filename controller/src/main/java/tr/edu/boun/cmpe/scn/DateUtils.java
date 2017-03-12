@@ -14,4 +14,7 @@ public class DateUtils {
         return cal.getTime();
     }
 
+    public static long currentTimeAddMilliSeconds(int milliseconds) {
+        return System.currentTimeMillis() + milliseconds;
+    }
 }

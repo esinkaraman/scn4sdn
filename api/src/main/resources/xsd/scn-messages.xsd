@@ -14,7 +14,12 @@
 
     <xsd:complexType name="ServiceProbe">
         <xsd:complexContent>
-            <xsd:extension base="ScnMessage"></xsd:extension>
+            <xsd:extension base="ScnMessage">
+                <xsd:sequence>
+                    <xsd:element name="cpuUsage" type="xsd:string" minOccurs="0"
+                                 maxOccurs="1"/>
+                </xsd:sequence>
+            </xsd:extension>
         </xsd:complexContent>
     </xsd:complexType>
 

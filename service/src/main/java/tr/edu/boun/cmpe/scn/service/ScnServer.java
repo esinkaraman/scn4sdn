@@ -100,7 +100,6 @@ public class ScnServer implements Runnable {
     }
 
     public void reply(ScnMessage reply, DatagramPacket packetReceived) {
-        String message = gson().toJson(reply);
         send(reply, packetReceived.getAddress(), packetReceived.getPort());
     }
 

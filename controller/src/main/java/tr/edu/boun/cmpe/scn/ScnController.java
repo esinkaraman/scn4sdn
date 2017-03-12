@@ -26,7 +26,6 @@ import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Host;
 import org.onosproject.net.HostId;
-import org.onosproject.net.HostLocation;
 import org.onosproject.net.Link;
 import org.onosproject.net.Path;
 import org.onosproject.net.PortNumber;
@@ -109,7 +108,7 @@ public class ScnController implements ScnService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected ComponentConfigService cfgService;
 
-    @Property(name = "probeEnabled", boolValue = true, label = "Enable ServiceProbe emitter; default is false")
+    @Property(name = "probeEnabled", boolValue = true, label = "Enable ServiceProbe emitter; default is true")
     boolean probeEnabled = true;
     @Property(name = "probePeriod", intValue = DEFAULT_PROBE_PERIOD_MILLISECONDS, label = "Configure ServiceProbe period in milliseconds; default is 1000 milliseconds")
     private int probePeriod = DEFAULT_PROBE_PERIOD_MILLISECONDS;
@@ -119,6 +118,8 @@ public class ScnController implements ScnService {
     @Property(name = "ipAddress", value = "10.0.0.190", label = "ipAddress value; default is 10.0.0.190")
     private String ipAddress = "10.0.0.190";
 
+    private static final int PROBE_EXPIRATION_MILLISECONDS = 20000;
+
     private ApplicationId appId;
     ScnPacketProcessor processor = new ScnPacketProcessor();
     HostListener hostListener = new InternalHostListener();
@@ -126,8 +127,6 @@ public class ScnController implements ScnService {
     int hardTimeoutSecs = 10;
 
     ScheduledExecutorService scheduler;
-
-    public static final int SCN_DST_IP_V4 = IPv4.toIPv4Address(Constants.SCN_BROADCAST_ADDRESS);
 
     private static final ConcurrentHashMap<String, Services> serviceNameToInstancesMap = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, SelectorValue> pathIds = new ConcurrentHashMap<>();
@@ -141,12 +140,15 @@ public class ScnController implements ScnService {
         requestPackets();
         hostService.addListener(hostListener);
         log.info("ScnHandler activated");
+
         scheduler = Executors.newScheduledThreadPool(2);
         readComponentConfiguration(context);
 
         scheduler.scheduleWithFixedDelay(pathIdChecker, (long) 3, (long) 3, TimeUnit.SECONDS);
         //check service probes per 10 milliseconds
         scheduler.scheduleWithFixedDelay(probeChecker, (long) 3, (long) 10, TimeUnit.MILLISECONDS);
+        //check services whether they services are sending probes or not. Remove services which are not sent any probe message for a predefined time period
+        scheduler.scheduleWithFixedDelay(probeReceiptChecker, (long) 20, (long) 20, TimeUnit.SECONDS);
     }
 
     final Runnable pathIdChecker = new Runnable() {
@@ -158,7 +160,14 @@ public class ScnController implements ScnService {
     final Runnable probeChecker = new Runnable() {
         @Override
         public void run() {
-            checkProbes();
+            checkAndEmitProbes();
+        }
+    };
+
+    final Runnable probeReceiptChecker = new Runnable() {
+        @Override
+        public void run() {
+            probeReceiptChecker();
         }
     };
 
@@ -306,7 +315,9 @@ public class ScnController implements ScnService {
                             context.block();
                             break;
                         case PROBE:
-                            //TODO
+                            ServiceProbe probe = gson.fromJson(payload, ServiceProbe.class);
+                            context.block();
+                            break;
                     }
                 }
             }
@@ -319,7 +330,7 @@ public class ScnController implements ScnService {
 
     boolean isScnMessage(ConnectPoint connectPoint, Ethernet eth) {
         IPv4 iPv4 = (IPv4) eth.getPayload();
-        if (iPv4.getDestinationAddress() == SCN_DST_IP_V4 &&
+        if (iPv4.getDestinationAddress() == FlowUtils.SCN_DST_IP_V4 &&
                 iPv4.getProtocol() == IPv4.PROTOCOL_UDP) {
             UDP udp = (UDP) iPv4.getPayload();
             return udp.getSourcePort() == Constants.SCN_SERVICE_PORT ||
@@ -368,12 +379,15 @@ public class ScnController implements ScnService {
         service.setDeviceId(receivedFrom.deviceId().toString());
         service.setDevicePort(receivedFrom.port().toLong());
         service.setHostId(src);
-        if (probeEnabled) {
-            Date expire = DateUtils.dateAddMilliSeconds(probePeriod);
-            service.setProbeExpiresAt(expire.getTime());
-            log.info("ServiceProbe will be send at {}", expire);
-        }
+        setProbeExpiration(service);
         return service;
+    }
+
+    private void setProbeExpiration(ServiceInfo service) {
+        if (probeEnabled) {
+            service.setProbeExpiresAt(DateUtils.currentTimeAddMilliSeconds(probePeriod));
+            log.info("ServiceProbe will be send at {}", new Date(service.getProbeExpiresAt()));
+        }
     }
 
     /**
@@ -441,63 +455,6 @@ public class ScnController implements ScnService {
         installPath(context, serviceComparable, true);
     }
 
-    private void handleFirstEdgeSwitch(Ethernet eth, TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,
-                                       MacAddress srcMac, MacAddress dstMac,
-                                       PortNumber inPort, PortNumber outPort, IpAddress srcAddress,
-                                       IpAddress dstAddress, int udpSrcPort, int udpDstPort, boolean interest) {
-        if (interest) {
-            selectorBuilder
-                    .matchInPort(inPort)
-                    //.matchEthSrc(srcMac)
-                    .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
-                    .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
-                    .matchIPDst(ipPrefix(SCN_DST_IP_V4))
-                    .matchIPProtocol(IPv4.PROTOCOL_UDP)
-                    .matchUdpDst(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
-                    .matchUdpSrc(TpPort.tpPort(udpSrcPort));
-
-            treatmentBuilder
-                    .setEthDst(dstMac)
-                    .setIpDst(dstAddress)
-                    .setUdpDst(TpPort.tpPort(udpDstPort))
-                    .setOutput(outPort);
-
-        } else {
-            //service data
-            selectorBuilder.matchInPort(inPort)
-                    //.matchEthSrc(srcMac)
-                    //.matchEthDst(dstMac)
-                    .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
-                    .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
-                    .matchIPDst(ipPrefix(dstAddress.getIp4Address().toInt()))
-                    .matchIPProtocol(IPv4.PROTOCOL_UDP)
-                    .matchUdpDst(TpPort.tpPort(udpDstPort))
-                    .matchUdpSrc(TpPort.tpPort(udpSrcPort));
-
-            treatmentBuilder
-                    //.setEthSrc(MacAddress.BROADCAST)
-                    //.setIpSrc(IpAddress.valueOf(SCN_DST_IP_V4))
-                    .setUdpSrc(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
-                    .setOutput(outPort);
-        }
-    }
-
-    private void handleCenterSwitch(TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,
-                                    MacAddress srcMac, MacAddress dstMac,
-                                    PortNumber inPort, PortNumber outPort, IpAddress srcAddress, IpAddress dstAddress,
-                                    int udpSrcPort, int udpDstPort) {
-        treatmentBuilder.setOutput(outPort);
-
-        selectorBuilder.matchInPort(inPort)
-                //.matchEthSrc(srcMac)
-                //.matchEthDst(dstMac)
-                .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
-                .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
-                .matchIPDst(ipPrefix(dstAddress.getIp4Address().toInt()))
-                .matchIPProtocol(IPv4.PROTOCOL_UDP)
-                .matchUdpSrc(TpPort.tpPort(udpSrcPort))
-                .matchUdpDst(TpPort.tpPort(udpDstPort));
-    }
 
     private void installPath(PacketContext context, ServiceComparable serviceComparable, boolean interest) {
         Ethernet eth = context.inPacket().parsed();
@@ -553,10 +510,10 @@ public class ScnController implements ScnService {
             outPort = dst.location().port();
             did = context.inPacket().receivedFrom().deviceId();
 
-            handleFirstEdgeSwitch(eth, selectorBuilder, treatmentBuilder,
-                                  srcMac, dstMac,
-                                  inPort, outPort, srcAddress, dstAddress,
-                                  udpSrcPort, udpDstPort, interest);
+            FlowUtils.handleFirstEdgeSwitch(eth, selectorBuilder, treatmentBuilder,
+                                            srcMac, dstMac,
+                                            inPort, outPort, srcAddress, dstAddress,
+                                            udpSrcPort, udpDstPort, interest);
             FlowRule flowRule = FlowUtils.createFlowRule(selectorBuilder, treatmentBuilder, did, appId, DEFAULT_PRIORITY, DEFAULT_TIMEOUT);
             flowRuleList.add(flowRule);
         } else {
@@ -576,11 +533,11 @@ public class ScnController implements ScnService {
                     outPort = link.src().port();
                     did = context.inPacket().receivedFrom().deviceId();
 
-                    handleFirstEdgeSwitch(eth, selectorBuilder, treatmentBuilder,
-                                          srcMac, dstMac,
-                                          inPort, outPort,
-                                          srcAddress, dstAddress,
-                                          udpSrcPort, udpDstPort, interest);
+                    FlowUtils.handleFirstEdgeSwitch(eth, selectorBuilder, treatmentBuilder,
+                                                    srcMac, dstMac,
+                                                    inPort, outPort,
+                                                    srcAddress, dstAddress,
+                                                    udpSrcPort, udpDstPort, interest);
 
                 } else if (i == path.links().size()) {
                     if (preLink == null) {
@@ -591,11 +548,11 @@ public class ScnController implements ScnService {
                     outPort = dst.location().port();
                     did = link.dst().deviceId();
 
-                    handleCenterSwitch(selectorBuilder, treatmentBuilder,
-                                       srcMac, dstMac,
-                                       inPort, outPort,
-                                       srcAddress, dstAddress,
-                                       udpSrcPort, udpDstPort);
+                    FlowUtils.handleCenterSwitch(selectorBuilder, treatmentBuilder,
+                                                 srcMac, dstMac,
+                                                 inPort, outPort,
+                                                 srcAddress, dstAddress,
+                                                 udpSrcPort, udpDstPort);
                 } else {
                     link = path.links().get(i);
                     if (preLink == null || preLink.dst() == null) {
@@ -606,11 +563,11 @@ public class ScnController implements ScnService {
                     outPort = link.src().port();
                     did = link.src().deviceId();
 
-                    handleCenterSwitch(selectorBuilder, treatmentBuilder,
-                                       srcMac, dstMac,
-                                       inPort, outPort,
-                                       srcAddress, dstAddress,
-                                       udpSrcPort, udpDstPort);
+                    FlowUtils.handleCenterSwitch(selectorBuilder, treatmentBuilder,
+                                                 srcMac, dstMac,
+                                                 inPort, outPort,
+                                                 srcAddress, dstAddress,
+                                                 udpSrcPort, udpDstPort);
                 }
                 FlowRule flowRule = FlowUtils.createFlowRule(selectorBuilder, treatmentBuilder, did, appId, DEFAULT_PRIORITY, DEFAULT_TIMEOUT);
                 flowRuleList.add(flowRule);
@@ -623,10 +580,6 @@ public class ScnController implements ScnService {
         installRule(context, flowRuleList, dst.location().port());
     }
 
-    private boolean serviceStillThere(HostLocation hostLocation, ServiceInfo serviceInfo) {
-        return hostLocation.deviceId().toString().equals(serviceInfo.getDeviceId())
-                && hostLocation.port().toLong() == serviceInfo.getDevicePort();
-    }
 
     private List<ServiceComparable> getComparableServiceList(PacketContext context, Services services) {
         final List<ServiceComparable> comparableList = new ArrayList<>();
@@ -641,17 +594,20 @@ public class ScnController implements ScnService {
                 continue;
             }
 
-            if (!serviceStillThere(serviceHost.location(), serviceInfo)) {
+            if (!FlowUtils.serviceStillThere(serviceHost.location(), serviceInfo)) {
                 log.warn("Service host location can not be verified. Thus, removed from the service list. {}, Host location={}", serviceInfo, serviceHost.location());
                 ScnController.serviceNameToInstancesMap.remove(serviceInfo);
                 continue;
             }
 
             // Are we on an edge switch that our destination is on?
+            serviceComparable = new ServiceComparable();
+            serviceComparable.setCompareBy(probeEnabled ? ServiceComparable.CompareBy.CPU_USAGE : ServiceComparable.CompareBy.DISTANCE);
+
             boolean onTheSameSwitch = isOnTheSameSwitch(context.inPacket().receivedFrom(), serviceHost);
             if (onTheSameSwitch) {
-                serviceComparable = new ServiceComparable();
                 serviceComparable.setDistance(0);
+                serviceComparable.setCpuUsage(serviceInfo.getCpuUsage());
                 serviceComparable.setServiceInfo(serviceInfo);
                 serviceComparable.setDestination(serviceHost);
                 comparableList.add(serviceComparable);
@@ -664,8 +620,8 @@ public class ScnController implements ScnService {
                              context.inPacket().parsed().getSourceMAC(), serviceHost.mac(), serviceInfo.getName());
                     continue;
                 }
-                serviceComparable = new ServiceComparable();
                 serviceComparable.setDistance(path.links().size());
+                serviceComparable.setCpuUsage(serviceInfo.getCpuUsage());
                 serviceComparable.setPath(path);
                 serviceComparable.setServiceInfo(serviceInfo);
                 serviceComparable.setDestination(serviceHost);
@@ -784,17 +740,46 @@ public class ScnController implements ScnService {
         }
     }
 
-    private void checkProbes() {
-        serviceNameToInstancesMap.values().forEach(services -> {
-            services.getServices().forEach(serviceInfo -> {
-                if (probeEnabled && serviceInfo.getProbeExpiresAt() != null) {
-                    long currentTime = new Date().getTime();
-                    if (exceeds(currentTime, serviceInfo.getProbeExpiresAt())) {
-                        sendServiceProbe(serviceInfo);
+    private void checkAndEmitProbes() {
+        if (probeEnabled) {
+            serviceNameToInstancesMap.values().forEach(services -> {
+                services.getServices().forEach(serviceInfo -> {
+                    if (serviceInfo.getProbeExpiresAt() != null) {
+                        long currentTime = System.currentTimeMillis();
+                        //check last probe time first
+                        if (exceeds(currentTime, serviceInfo.getProbeExpiresAt())) {
+                            sendServiceProbe(serviceInfo);
+                            setProbeExpiration(serviceInfo);
+                        }
                     }
-                }
+                });
             });
-        });
+        }
+    }
+
+    private void probeReceiptChecker() {
+        if (probeEnabled) {
+            serviceNameToInstancesMap.values();
+            List<ServiceInfo> toRemove;
+            for (Services services : serviceNameToInstancesMap.values()) {
+                Iterable<ServiceInfo> serviceInfoList = services.getServices();
+                toRemove = new ArrayList<>();
+                if (serviceInfoList != null) {
+                    serviceInfoList.forEach(serviceInfo -> {
+                        //check probe receipt iff a probe has been sent by the controller previously
+                        //if a service is not sent a probe, it is pointless to expect a prompt response from it
+                        if (serviceInfo.probeEverSent() &&
+                                exceeds(System.currentTimeMillis(), serviceInfo.getLastProbeTime() + PROBE_EXPIRATION_MILLISECONDS)) {
+                            toRemove.add(serviceInfo);
+                        }
+                    });
+                }
+                //remove services which have not been sent any probe for a while
+                toRemove.forEach(serviceInfo -> {
+                    services.removeInstance(DeviceId.deviceId(serviceInfo.getDeviceId()), PortNumber.portNumber(serviceInfo.getDevicePort()));
+                });
+            }
+        }
     }
 
     private boolean exceeds(long date1, long date2) {
@@ -805,7 +790,7 @@ public class ScnController implements ScnService {
         log.info("Sending probe to {} at {}:{}", serviceInfo.getName(), serviceInfo.getDeviceId(), serviceInfo.getDevicePort());
         Host serviceHost = hostService.getHost(serviceInfo.getHostId());
 
-        if (!serviceStillThere(serviceHost.location(), serviceInfo)) {
+        if (!FlowUtils.serviceStillThere(serviceHost.location(), serviceInfo)) {
             log.warn("Service host location can not be verified. Thus, not send ServiceProbe. {}, Host location={}", serviceInfo, serviceHost.location());
             return;
         }
@@ -830,7 +815,26 @@ public class ScnController implements ScnService {
         OutboundPacket packet = new DefaultOutboundPacket(serviceHost.location().deviceId(),
                                                           treatment, ByteBuffer.wrap(eth.serialize()));
 
+        serviceInfo.setLastProbeTime(System.currentTimeMillis());
         packetService.emit(packet);
         log.info("ServiceProbe message has been sent to {} at {}", serviceInfo.getName(), serviceHost);
     }
+
+    private void processServiceProbe(PacketContext context, ServiceProbe probe) {
+        Services services = serviceNameToInstancesMap.get(probe.getServiceName());
+        if (services != null) {
+            ConnectPoint connectPoint = context.inPacket().receivedFrom();
+            ServiceInfo service = services.getService(connectPoint.deviceId(), connectPoint.port());
+            if (service == null) {
+                log.warn("No service instance found in ServiceRegistry. Can not process ServiceProbe. ServiceName={} Location={}", probe.getServiceName(), connectPoint);
+                return;
+            }
+            Long cpuUsage = FlowUtils.parseCpuUsage(probe.getCpuUsage());
+            if (cpuUsage != null) {
+                service.setLastCpuUsageValue(cpuUsage);
+            }
+        }
+    }
+
+
 }

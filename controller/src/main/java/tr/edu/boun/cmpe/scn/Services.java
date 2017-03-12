@@ -36,6 +36,11 @@ public class Services {
         return removed;
     }
 
+    public ServiceInfo getService(DeviceId deviceId, PortNumber portNumber) {
+        String key = prepareKey(deviceId, portNumber);
+        return serviceMap.get(key);
+    }
+
     public Iterable<ServiceInfo> getServices() {
         return Collections.unmodifiableCollection(serviceMap.values());
     }

@@ -1,25 +1,36 @@
 package tr.edu.boun.cmpe.scn;
 
+import org.onlab.packet.EthType;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.Ip4Prefix;
+import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.TCP;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.UDP;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.HostLocation;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
+import org.slf4j.Logger;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
+
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Created by esinka on 2/6/2017.
  */
 public class FlowUtils {
+
+    private static final Logger log = getLogger(FlowUtils.class);
+
+    public static final int SCN_DST_IP_V4 = IPv4.toIPv4Address(Constants.SCN_BROADCAST_ADDRESS);
 
     public static TrafficTreatment.Builder createDefaultTrafficTreatmentBuilder(PortNumber outPort) {
         TrafficTreatment.Builder defaultTreatmentBuilder = DefaultTrafficTreatment.builder();
@@ -38,6 +49,11 @@ public class FlowUtils {
                 .fromApp(appId)
                 .makeTemporary(flowTimeout)
                 .build();
+    }
+
+    public static boolean serviceStillThere(HostLocation hostLocation, ServiceInfo serviceInfo) {
+        return hostLocation.deviceId().toString().equals(serviceInfo.getDeviceId())
+                && hostLocation.port().toLong() == serviceInfo.getDevicePort();
     }
 
     public static SelectorValue createSelectorValue(Ethernet ethPkt, Boolean reverse, int timeoutSecs) {
@@ -81,4 +97,77 @@ public class FlowUtils {
                 .append(serviceInfo.getPort()).toString();
     }
 
+    public static Ip4Prefix ipPrefix(int ipAddress) {
+        return Ip4Prefix.valueOf(ipAddress, Ip4Prefix.MAX_MASK_LENGTH);
+    }
+
+    public static void handleFirstEdgeSwitch(Ethernet eth, TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,
+                                             MacAddress srcMac, MacAddress dstMac,
+                                             PortNumber inPort, PortNumber outPort, IpAddress srcAddress,
+                                             IpAddress dstAddress, int udpSrcPort, int udpDstPort, boolean interest) {
+        if (interest) {
+            selectorBuilder
+                    .matchInPort(inPort)
+                    //.matchEthSrc(srcMac)
+                    .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
+                    .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
+                    .matchIPDst(ipPrefix(SCN_DST_IP_V4))
+                    .matchIPProtocol(IPv4.PROTOCOL_UDP)
+                    .matchUdpDst(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
+                    .matchUdpSrc(TpPort.tpPort(udpSrcPort));
+
+            treatmentBuilder
+                    .setEthDst(dstMac)
+                    .setIpDst(dstAddress)
+                    .setUdpDst(TpPort.tpPort(udpDstPort))
+                    .setOutput(outPort);
+
+        } else {
+            //service data
+            selectorBuilder.matchInPort(inPort)
+                    //.matchEthSrc(srcMac)
+                    //.matchEthDst(dstMac)
+                    .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
+                    .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
+                    .matchIPDst(ipPrefix(dstAddress.getIp4Address().toInt()))
+                    .matchIPProtocol(IPv4.PROTOCOL_UDP)
+                    .matchUdpDst(TpPort.tpPort(udpDstPort))
+                    .matchUdpSrc(TpPort.tpPort(udpSrcPort));
+
+            treatmentBuilder
+                    //.setEthSrc(MacAddress.BROADCAST)
+                    //.setIpSrc(IpAddress.valueOf(SCN_DST_IP_V4))
+                    .setUdpSrc(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
+                    .setOutput(outPort);
+        }
+    }
+
+    public static void handleCenterSwitch(TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,
+                                          MacAddress srcMac, MacAddress dstMac,
+                                          PortNumber inPort, PortNumber outPort, IpAddress srcAddress, IpAddress dstAddress,
+                                          int udpSrcPort, int udpDstPort) {
+        treatmentBuilder.setOutput(outPort);
+
+        selectorBuilder.matchInPort(inPort)
+                //.matchEthSrc(srcMac)
+                //.matchEthDst(dstMac)
+                .matchEthType(EthType.EtherType.IPV4.ethType().toShort())
+                .matchIPSrc(ipPrefix(srcAddress.getIp4Address().toInt()))
+                .matchIPDst(ipPrefix(dstAddress.getIp4Address().toInt()))
+                .matchIPProtocol(IPv4.PROTOCOL_UDP)
+                .matchUdpSrc(TpPort.tpPort(udpSrcPort))
+                .matchUdpDst(TpPort.tpPort(udpDstPort));
+    }
+
+    public static Long parseCpuUsage(String cpuUsageStr) {
+        Long cpuUsage = null;
+        if (cpuUsage != null) {
+            try {
+                cpuUsage = Long.parseLong(cpuUsageStr);
+            } catch (NumberFormatException e) {
+                log.info("Unable to parse cpu usage valu", e);
+            }
+        }
+        return cpuUsage;
+    }
 }
