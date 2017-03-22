@@ -12,7 +12,14 @@ import java.io.IOException;
  * Created by esinka on 2/4/2017.
  */
 public class TestInterest {
+
+    IScnClient client = null;
+
     public static void main(String[] args) {
+        new TestInterest().sendInterest(args);
+    }
+
+    public void sendInterest(String[] args) {
         if (args.length < 1) {
             System.out.println("Usage: <IP Address>");
             return;
@@ -34,20 +41,27 @@ public class TestInterest {
         arg.setName("a1");
         arg.setValue("avalue1");
         interest.getArguments().getArgument().add(arg);
-        IScnClient client = null;
+
+        ResponseListener listener = new ResponseListener();
 
         try {
             client = ScnClient.newInstance(serviceName, address);
-            ServiceData serviceData = client.sendAndReceive(interest);
-            System.out.println("received " + serviceData);
+            client.send(interest, listener);
         } catch (IOException e) {
             System.out.println("exception occurred!!!");
             e.printStackTrace();
-        } finally {
-            if(client != null) {
+        }
+    }
+
+    public class ResponseListener implements IScnListener {
+
+        @Override
+        public void received(ServiceData serviceData) {
+            System.out.println("ServiceData received:" + serviceData);
+
+            if (client != null) {
                 client.close();
             }
         }
-
     }
 }

@@ -9,8 +9,8 @@ import java.io.IOException;
  * Created by esinka on 2/4/2017.
  */
 public interface IScnClient {
-
-    ServiceData sendAndReceive(ServiceInterest interest) throws IOException;
+    @Deprecated
+    ServiceData sendSynchronous(ServiceInterest interest) throws IOException;
     void send(ServiceInterest interest, IScnListener listener) throws IOException;
     void close();
 }

@@ -73,7 +73,7 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
     }
 
     @Override
-    public ServiceData sendAndReceive(ServiceInterest interest) throws IOException {
+    public ServiceData sendSynchronous(ServiceInterest interest) throws IOException {
         checkParameters(interest);
         return sendAndReceive(interest);
     }
