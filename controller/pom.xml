@@ -17,7 +17,9 @@
         <onos.app.title>Service Centric Networking App</onos.app.title>
         <onos.app.category>Networking</onos.app.category>
         <onos.app.url>http://onosproject.org</onos.app.url>
-        <onos.app.readme>Service Centric Networking application using flow subsystem.</onos.app.readme>
+        <onos.app.readme>Service Centric Networking application using flow
+            subsystem.
+        </onos.app.readme>
     </properties>
 
     <dependencies>
@@ -31,12 +33,6 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.6.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.onosproject</groupId>
-            <artifactId>onos-app-fwd</artifactId>
-            <version>1.6.0</version>
         </dependency>
     </dependencies>
 

@@ -88,7 +88,7 @@ public class ScnController implements ScnService {
 
     private static final int DEFAULT_PRIORITY = 10;
     private static final int DEFAULT_TIMEOUT = 10;
-    private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 1000;
+    private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 5000;
     private static final String SENDER_MAC_ADDRESS = "00:00:00:00:00:01";
 
     private static byte packetTTL = (byte) 127;
@@ -118,7 +118,7 @@ public class ScnController implements ScnService {
     @Property(name = "ipAddress", value = "10.0.0.190", label = "ipAddress value; default is 10.0.0.190")
     private String ipAddress = "10.0.0.190";
 
-    private static final int PROBE_EXPIRATION_MILLISECONDS = 20000;
+    private static final int PROBE_EXPIRATION_MILLISECONDS = 15000;
 
     private ApplicationId appId;
     ScnPacketProcessor processor = new ScnPacketProcessor();
@@ -141,14 +141,14 @@ public class ScnController implements ScnService {
         hostService.addListener(hostListener);
         log.info("ScnHandler activated");
 
-        scheduler = Executors.newScheduledThreadPool(2);
+        scheduler = Executors.newScheduledThreadPool(3);
         readComponentConfiguration(context);
 
         scheduler.scheduleWithFixedDelay(pathIdChecker, (long) 3, (long) 3, TimeUnit.SECONDS);
         //check service probes per 10 milliseconds
         scheduler.scheduleWithFixedDelay(probeChecker, (long) 3, (long) 10, TimeUnit.MILLISECONDS);
         //check services whether they services are sending probes or not. Remove services which are not sent any probe message for a predefined time period
-        scheduler.scheduleWithFixedDelay(probeReceiptChecker, (long) 20, (long) 20, TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(probeReceiptChecker, (long) 10, (long) 10, TimeUnit.SECONDS);
     }
 
     final Runnable pathIdChecker = new Runnable() {
@@ -282,43 +282,46 @@ public class ScnController implements ScnService {
             }
 
             if (EthType.EtherType.lookup(eth.getEtherType()).equals(EthType.EtherType.IPV4)) {
+                //log.info("-> RECEIVED: {} src={} dst={}", context.inPacket().receivedFrom(), eth.getSourceMAC(), eth.getDestinationMAC());
+                try {
+                    if (isScnMessage(context.inPacket().receivedFrom(), eth)) {
+                        IPv4 iPv4 = (IPv4) eth.getPayload();
+                        UDP udp = (UDP) iPv4.getPayload();
+                        if (udp.getPayload() == null) {
+                            return;
+                        }
+                        //ObjectMapper mapper = new ObjectMapper();
+                        String payload = getPayload(udp.getPayload());
+                        log.info("--> SCN message received from {}. {}", context.inPacket().receivedFrom(), payload);
+                        Gson mapper = new Gson();
+                        ScnMessage scnMessage = mapper.fromJson(payload, ScnMessage.class);
+                        ScnMessageType scnMessageType = ScnMessageType.valueOf(scnMessage.getMessageTypeId());
 
-                log.info("----> RECEIVED: {} src={} dst={}", context.inPacket().receivedFrom(), eth.getSourceMAC(), eth.getDestinationMAC());
-
-                if (isScnMessage(context.inPacket().receivedFrom(), eth)) {
-                    IPv4 iPv4 = (IPv4) eth.getPayload();
-                    UDP udp = (UDP) iPv4.getPayload();
-                    if (udp.getPayload() == null) {
-                        return;
+                        switch (scnMessageType) {
+                            case UP:
+                                ServiceUp serviceUp = mapper.fromJson(payload, ServiceUp.class);
+                                processServiceUp(context, serviceUp);
+                                context.block();
+                                break;
+                            case INTEREST:
+                                ServiceInterest interest = mapper.fromJson(payload, ServiceInterest.class);
+                                processServiceInterest(context, interest);
+                                context.block();
+                                break;
+                            case DATA:
+                                ServiceData data = mapper.fromJson(payload, ServiceData.class);
+                                processServiceData(context, data);
+                                context.block();
+                                break;
+                            case PROBE:
+                                ServiceProbe probe = mapper.fromJson(payload, ServiceProbe.class);
+                                processServiceProbe(context, probe);
+                                context.block();
+                                break;
+                        }
                     }
-                    Gson gson = new Gson();
-                    String payload = getPayload(udp.getPayload());
-                    log.info("SCN message received from {} --> {}", context.inPacket().receivedFrom(), payload);
-
-                    ScnMessage scnMessage = gson.fromJson(payload, ScnMessage.class);
-                    ScnMessageType scnMessageType = ScnMessageType.valueOf(scnMessage.getMessageTypeId());
-
-                    switch (scnMessageType) {
-                        case UP:
-                            ServiceUp serviceUp = gson.fromJson(payload, ServiceUp.class);
-                            processServiceUp(context, serviceUp);
-                            context.block();
-                            break;
-                        case INTEREST:
-                            ServiceInterest interest = gson.fromJson(payload, ServiceInterest.class);
-                            processServiceInterest(context, interest);
-                            context.block();
-                            break;
-                        case DATA:
-                            ServiceData data = gson.fromJson(payload, ServiceData.class);
-                            processServiceData(context, data);
-                            context.block();
-                            break;
-                        case PROBE:
-                            ServiceProbe probe = gson.fromJson(payload, ServiceProbe.class);
-                            context.block();
-                            break;
-                    }
+                } catch (Exception e) {
+                    log.error("Unable to process the packet", e);
                 }
             }
         }
@@ -349,7 +352,6 @@ public class ScnController implements ScnService {
     boolean fromService(ConnectPoint connectPoint, Ethernet ethernet, int srcUdpPort) {
         String locationKey = FlowUtils.buildServiceLocationKey(connectPoint.deviceId(), connectPoint.port(), ethernet.getSourceMAC(), srcUdpPort);
         ServiceInfo serviceInfo = serviceLocationToInstanceMap.get(locationKey);
-        log.info("Checking location key: {}", locationKey);
         return serviceInfo == null ? false : true;
     }
 
@@ -627,7 +629,6 @@ public class ScnController implements ScnService {
                 serviceComparable.setDestination(serviceHost);
                 comparableList.add(serviceComparable);
             }
-
         }
         return comparableList;
     }
@@ -745,11 +746,15 @@ public class ScnController implements ScnService {
             serviceNameToInstancesMap.values().forEach(services -> {
                 services.getServices().forEach(serviceInfo -> {
                     if (serviceInfo.getProbeExpiresAt() != null) {
-                        long currentTime = System.currentTimeMillis();
-                        //check last probe time first
-                        if (exceeds(currentTime, serviceInfo.getProbeExpiresAt())) {
-                            sendServiceProbe(serviceInfo);
-                            setProbeExpiration(serviceInfo);
+                        try {
+                            long currentTime = System.currentTimeMillis();
+                            //check last probe time first
+                            if (exceeds(currentTime, serviceInfo.getProbeExpiresAt())) {
+                                sendServiceProbe(serviceInfo);
+                                setProbeExpiration(serviceInfo);
+                            }
+                        } catch (Exception e) {
+                            log.error("ServiceProbe can not be sent", e);
                         }
                     }
                 });
@@ -759,25 +764,28 @@ public class ScnController implements ScnService {
 
     private void probeReceiptChecker() {
         if (probeEnabled) {
-            serviceNameToInstancesMap.values();
-            List<ServiceInfo> toRemove;
             for (Services services : serviceNameToInstancesMap.values()) {
-                Iterable<ServiceInfo> serviceInfoList = services.getServices();
-                toRemove = new ArrayList<>();
-                if (serviceInfoList != null) {
-                    serviceInfoList.forEach(serviceInfo -> {
-                        //check probe receipt iff a probe has been sent by the controller previously
-                        //if a service is not sent a probe, it is pointless to expect a prompt response from it
-                        if (serviceInfo.probeEverSent() &&
-                                exceeds(System.currentTimeMillis(), serviceInfo.getLastProbeTime() + PROBE_EXPIRATION_MILLISECONDS)) {
-                            toRemove.add(serviceInfo);
-                        }
+                try {
+                    Iterable<ServiceInfo> serviceInfoList = services.getServices();
+                    final List<ServiceInfo> toRemove = new ArrayList<>();
+                    if (serviceInfoList != null) {
+                        serviceInfoList.forEach(serviceInfo -> {
+                            //check probe receipt iff a probe has been sent by the controller previously
+                            //if a service is not sent a probe, it is pointless to expect a prompt response from it
+                            if (serviceInfo.probeEverSent() &&
+                                    exceeds(System.currentTimeMillis(), serviceInfo.getLastReceivedProbeTime() + PROBE_EXPIRATION_MILLISECONDS)) {
+                                toRemove.add(serviceInfo);
+                            }
+                        });
+                    }
+                    //remove services which have not been sent any probe for a while
+                    toRemove.forEach(serviceInfo -> {
+                        services.removeInstance(DeviceId.deviceId(serviceInfo.getDeviceId()), PortNumber.portNumber(serviceInfo.getDevicePort()));
+                        log.info("Service instance removed since no probe has been received for {} milliseconds. {}", PROBE_EXPIRATION_MILLISECONDS, serviceInfo);
                     });
+                } catch (Exception e) {
+                    log.error("Unable to check ServiceProbe receipt", e);
                 }
-                //remove services which have not been sent any probe for a while
-                toRemove.forEach(serviceInfo -> {
-                    services.removeInstance(DeviceId.deviceId(serviceInfo.getDeviceId()), PortNumber.portNumber(serviceInfo.getDevicePort()));
-                });
             }
         }
     }
@@ -787,7 +795,7 @@ public class ScnController implements ScnService {
     }
 
     private void sendServiceProbe(ServiceInfo serviceInfo) {
-        log.info("Sending probe to {} at {}:{}", serviceInfo.getName(), serviceInfo.getDeviceId(), serviceInfo.getDevicePort());
+        log.info("Sending ServiceProbe to {} at {}:{}", serviceInfo.getName(), serviceInfo.getDeviceId(), serviceInfo.getDevicePort());
         Host serviceHost = hostService.getHost(serviceInfo.getHostId());
 
         if (!FlowUtils.serviceStillThere(serviceHost.location(), serviceInfo)) {
@@ -798,30 +806,33 @@ public class ScnController implements ScnService {
         ServiceProbe serviceProbe = new ServiceProbe();
         serviceProbe.setMessageTypeId(ScnMessageType.PROBE.getId());
         serviceProbe.setServiceName(serviceInfo.getName());
-        Ethernet eth = new Ethernet();
 
-        eth.setDestinationMACAddress(serviceHost.mac().toBytes())
-                .setSourceMACAddress(macAddress)
-                .setEtherType(Ethernet.TYPE_IPV4).setPayload(serviceProbe);
+        UDP udp = new UDP();
+        udp.setPayload(serviceProbe);
+        udp.setDestinationPort(serviceInfo.getPort());
+        udp.setSourcePort(Constants.SCN_CLIENT_PORT);
 
         IPv4 iPv4 = new IPv4();
         iPv4.setSourceAddress(ipAddress);
         iPv4.setDestinationAddress(serviceHost.ipAddresses().iterator().next().getIp4Address().toInt());
         iPv4.setTtl(packetTTL);
-        iPv4.setPayload(serviceProbe);
-        eth.setPayload(iPv4);
+        iPv4.setPayload(udp);
+
+        Ethernet eth = new Ethernet();
+        eth.setDestinationMACAddress(serviceHost.mac().toBytes())
+                .setSourceMACAddress(macAddress)
+                .setEtherType(Ethernet.TYPE_IPV4).setPayload(iPv4);
 
         TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(serviceHost.location().port()).build();
         OutboundPacket packet = new DefaultOutboundPacket(serviceHost.location().deviceId(),
                                                           treatment, ByteBuffer.wrap(eth.serialize()));
-
-        serviceInfo.setLastProbeTime(System.currentTimeMillis());
         packetService.emit(packet);
         log.info("ServiceProbe message has been sent to {} at {}", serviceInfo.getName(), serviceHost);
     }
 
     private void processServiceProbe(PacketContext context, ServiceProbe probe) {
         Services services = serviceNameToInstancesMap.get(probe.getServiceName());
+        log.info("Processing ServiceProbe message.");
         if (services != null) {
             ConnectPoint connectPoint = context.inPacket().receivedFrom();
             ServiceInfo service = services.getService(connectPoint.deviceId(), connectPoint.port());
@@ -832,9 +843,8 @@ public class ScnController implements ScnService {
             Long cpuUsage = FlowUtils.parseCpuUsage(probe.getCpuUsage());
             if (cpuUsage != null) {
                 service.setLastCpuUsageValue(cpuUsage);
+                service.setLastReceivedProbeTime(System.currentTimeMillis());
             }
         }
     }
-
-
 }

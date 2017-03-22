@@ -2,12 +2,15 @@ package tr.edu.boun.cmpe.scn;
 
 import org.onosproject.net.HostId;
 
+import java.text.DecimalFormat;
 import java.util.Date;
 
 /**
  * Created by esinka on 1/6/2017.
  */
 public class ServiceInfo implements Cloneable {
+    DecimalFormat df = new DecimalFormat("#,###,###");
+
     public static final long EMPTY_PROBE_TIME = -1L;
     private String name;
     private int port;
@@ -19,7 +22,7 @@ public class ServiceInfo implements Cloneable {
     private Long probeExpiresAt;
     private long lastCpuUsageValue = 0l;
     private long cpuUsage = 0l;
-    private long lastProbeTime = EMPTY_PROBE_TIME;
+    private long lastReceivedProbeTime = EMPTY_PROBE_TIME;
 
     public String getName() {
         return name;
@@ -78,25 +81,29 @@ public class ServiceInfo implements Cloneable {
     }
 
     public void setLastCpuUsageValue(long cpuUsage) {
+
         this.cpuUsage = cpuUsage - lastCpuUsageValue;
         this.lastCpuUsageValue = cpuUsage;
-        lastProbeTime = System.currentTimeMillis();
     }
 
     public long getCpuUsage() {
         return cpuUsage;
     }
 
-    public Long getLastProbeTime() {
-        return lastProbeTime;
+    public Long getLastReceivedProbeTime() {
+        return lastReceivedProbeTime;
     }
 
-    public void setLastProbeTime(long lastProbeTime) {
-        this.lastProbeTime = lastProbeTime;
+    public void setLastReceivedProbeTime(long lastProbeTime) {
+        this.lastReceivedProbeTime = lastProbeTime;
     }
 
     public boolean probeEverSent() {
-        return lastProbeTime != EMPTY_PROBE_TIME;
+        return lastReceivedProbeTime != EMPTY_PROBE_TIME;
+    }
+
+    private String format(long number) {
+        return df.format(number);
     }
 
     @Override
@@ -107,9 +114,9 @@ public class ServiceInfo implements Cloneable {
         sb.append(", deviceId='").append(deviceId).append('\'');
         sb.append(", devicePort=").append(devicePort);
         sb.append(", hostId=").append(hostId);
-        sb.append(", lastCpuUsageValue=").append(lastCpuUsageValue);
-        sb.append(", cpuUsage=").append(cpuUsage);
-        sb.append(", lastProbeTime=").append(lastProbeTime);
+        sb.append(", lastCpuUsageValue=").append(format(lastCpuUsageValue));
+        sb.append(", cpuUsage=").append(format(cpuUsage));
+        sb.append(", lastReceivedProbeTime=").append(lastReceivedProbeTime);
         sb.append('}');
         return sb.toString();
     }

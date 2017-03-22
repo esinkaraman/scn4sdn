@@ -161,7 +161,7 @@ public class FlowUtils {
 
     public static Long parseCpuUsage(String cpuUsageStr) {
         Long cpuUsage = null;
-        if (cpuUsage != null) {
+        if (cpuUsageStr != null) {
             try {
                 cpuUsage = Long.parseLong(cpuUsageStr);
             } catch (NumberFormatException e) {
