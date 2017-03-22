@@ -8,52 +8,22 @@
 
 package tr.edu.boun.cmpe.scn.api.message;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlType;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
 
+import java.io.UnsupportedEncodingException;
 
-/**
- * <p>Java class for ServiceInterest complex type.
- * 
- * <p>The following schema fragment specifies the expected content contained within this class.
- * 
- * <pre>
- * &lt;complexType name="ServiceInterest"&gt;
- *   &lt;complexContent&gt;
- *     &lt;extension base="{}ScnMessage"&gt;
- *       &lt;sequence&gt;
- *         &lt;element name="messageId" type="{http://www.w3.org/2001/XMLSchema}string"/&gt;
- *         &lt;element name="arguments" type="{}Arguments" minOccurs="0"/&gt;
- *       &lt;/sequence&gt;
- *     &lt;/extension&gt;
- *   &lt;/complexContent&gt;
- * &lt;/complexType&gt;
- * </pre>
- * 
- * 
- */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "ServiceInterest", propOrder = {
-    "messageId",
-    "arguments"
-})
-public class ServiceInterest
-    extends ScnMessage
-{
+public class ServiceInterest extends ScnMessage {
 
-    @XmlElement(required = true)
     protected String messageId;
     protected Arguments arguments;
 
     /**
      * Gets the value of the messageId property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link String }
-     *     
+     *
+     * @return possible object is
+     * {@link String }
      */
     public String getMessageId() {
         return messageId;
@@ -61,11 +31,9 @@ public class ServiceInterest
 
     /**
      * Sets the value of the messageId property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link String }
-     *     
+     *
+     * @param value allowed object is
+     *              {@link String }
      */
     public void setMessageId(String value) {
         this.messageId = value;
@@ -73,11 +41,9 @@ public class ServiceInterest
 
     /**
      * Gets the value of the arguments property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link Arguments }
-     *     
+     *
+     * @return possible object is
+     * {@link Arguments }
      */
     public Arguments getArguments() {
         return arguments;
@@ -85,14 +51,33 @@ public class ServiceInterest
 
     /**
      * Sets the value of the arguments property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link Arguments }
-     *     
+     *
+     * @param value allowed object is
+     *              {@link Arguments }
      */
     public void setArguments(Arguments value) {
         this.arguments = value;
     }
 
+    @Override
+    public byte[] serialize() {
+        byte[] payload = null;
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            payload = mapper.writeValueAsString(copy()).getBytes(Constants.UTF8);
+        } catch (UnsupportedEncodingException | JsonProcessingException e) {
+            System.err.println("Unable to serialize the packet " + this.getClass());
+            e.printStackTrace();
+        }
+        return payload == null ? new byte[0] : payload;
+    }
+
+    private ServiceInterest copy() {
+        ServiceInterest msg = new ServiceInterest();
+        msg.setServiceName(serviceName);
+        msg.setMessageTypeId(messageTypeId);
+        msg.setMessageId(messageId);
+        msg.setArguments(arguments);
+        return msg;
+    }
 }

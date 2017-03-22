@@ -8,43 +8,18 @@
 
 package tr.edu.boun.cmpe.scn.api.message;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlType;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
 
+import java.io.UnsupportedEncodingException;
 
-/**
- * <p>Java class for ServiceUp complex type.
- * 
- * <p>The following schema fragment specifies the expected content contained within this class.
- * 
- * <pre>
- * &lt;complexType name="ServiceUp"&gt;
- *   &lt;complexContent&gt;
- *     &lt;extension base="{}ScnMessage"&gt;
- *       &lt;sequence&gt;
- *         &lt;element name="servicePort" type="{http://www.w3.org/2001/XMLSchema}int"/&gt;
- *       &lt;/sequence&gt;
- *     &lt;/extension&gt;
- *   &lt;/complexContent&gt;
- * &lt;/complexType&gt;
- * </pre>
- * 
- * 
- */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "ServiceUp", propOrder = {
-    "servicePort"
-})
-public class ServiceUp
-    extends ScnMessage
-{
+public class ServiceUp extends ScnMessage {
 
     protected int servicePort;
 
     /**
      * Gets the value of the servicePort property.
-     * 
      */
     public int getServicePort() {
         return servicePort;
@@ -52,10 +27,30 @@ public class ServiceUp
 
     /**
      * Sets the value of the servicePort property.
-     * 
      */
     public void setServicePort(int value) {
         this.servicePort = value;
+    }
+
+    @Override
+    public byte[] serialize() {
+        byte[] payload = null;
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            payload = mapper.writeValueAsString(copy()).getBytes(Constants.UTF8);
+        } catch (UnsupportedEncodingException | JsonProcessingException e) {
+            System.err.println("Unable to serialize the packet " + this.getClass());
+            e.printStackTrace();
+        }
+        return payload == null ? new byte[0] : payload;
+    }
+
+    private ServiceUp copy() {
+        ServiceUp up = new ServiceUp();
+        up.setServicePort(servicePort);
+        up.setMessageTypeId(messageTypeId);
+        up.setServiceName(serviceName);
+        return up;
     }
 
 }

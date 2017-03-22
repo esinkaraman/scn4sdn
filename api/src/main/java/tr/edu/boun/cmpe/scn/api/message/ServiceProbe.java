@@ -8,37 +8,19 @@
 
 package tr.edu.boun.cmpe.scn.api.message;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
+import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlType;
+import java.io.UnsupportedEncodingException;
 
 
-/**
- * <p>Java class for ServiceProbe complex type.
- * 
- * <p>The following schema fragment specifies the expected content contained within this class.
- * 
- * <pre>
- * &lt;complexType name="ServiceProbe"&gt;
- *   &lt;complexContent&gt;
- *     &lt;extension base="{}ScnMessage"&gt;
- *       &lt;sequence&gt;
- *         &lt;element name="cpuUsage" type="{http://www.w3.org/2001/XMLSchema}string" minOccurs="0"/&gt;
- *       &lt;/sequence&gt;
- *     &lt;/extension&gt;
- *   &lt;/complexContent&gt;
- * &lt;/complexType&gt;
- * </pre>
- * 
- * 
- */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "ServiceProbe", propOrder = {
-    "cpuUsage"
-})
-public class ServiceProbe
-    extends ScnMessage
-{
+public class ServiceProbe extends ScnMessage {
 
     protected String cpuUsage;
 
@@ -66,4 +48,25 @@ public class ServiceProbe
         this.cpuUsage = value;
     }
 
+    @Override
+    public byte[] serialize() {
+        byte[] payload = null;
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            payload = mapper.writeValueAsString(copy()).getBytes(Constants.UTF8);
+        } catch (UnsupportedEncodingException | JsonProcessingException e) {
+            System.err.println("Unable to serialize the packet " + this.getClass());
+            e.printStackTrace();
+        }
+
+        return payload == null ? new byte[0] : payload;
+    }
+
+    private ServiceProbe copy() {
+        ServiceProbe probe = new ServiceProbe();
+        probe.setCpuUsage(cpuUsage);
+        probe.setServiceName(serviceName);
+        probe.setMessageTypeId(messageTypeId);
+        return probe;
+    }
 }

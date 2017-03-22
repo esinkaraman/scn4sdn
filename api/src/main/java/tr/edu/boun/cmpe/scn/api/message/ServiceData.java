@@ -8,49 +8,24 @@
 
 package tr.edu.boun.cmpe.scn.api.message;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
+import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
 
+import java.io.UnsupportedEncodingException;
 
-/**
- * <p>Java class for ServiceData complex type.
- * 
- * <p>The following schema fragment specifies the expected content contained within this class.
- * 
- * <pre>
- * &lt;complexType name="ServiceData"&gt;
- *   &lt;complexContent&gt;
- *     &lt;extension base="{}ScnMessage"&gt;
- *       &lt;sequence&gt;
- *         &lt;element name="messageId" type="{http://www.w3.org/2001/XMLSchema}string"/&gt;
- *       &lt;/sequence&gt;
- *     &lt;/extension&gt;
- *   &lt;/complexContent&gt;
- * &lt;/complexType&gt;
- * </pre>
- * 
- * 
- */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "ServiceData", propOrder = {
-    "messageId"
-})
-public class ServiceData
-    extends ScnMessage
-{
+public class ServiceData extends ScnMessage {
 
-    @XmlElement(required = true)
     protected String messageId;
+
 
     /**
      * Gets the value of the messageId property.
-     * 
-     * @return
-     *     possible object is
-     *     {@link String }
-     *     
+     *
+     * @return possible object is
+     * {@link String }
      */
     public String getMessageId() {
         return messageId;
@@ -58,14 +33,32 @@ public class ServiceData
 
     /**
      * Sets the value of the messageId property.
-     * 
-     * @param value
-     *     allowed object is
-     *     {@link String }
-     *     
+     *
+     * @param value allowed object is
+     *              {@link String }
      */
     public void setMessageId(String value) {
         this.messageId = value;
     }
 
+    @Override
+    public byte[] serialize() {
+        byte[] payload = null;
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            payload = mapper.writeValueAsString(copy()).getBytes(Constants.UTF8);
+        } catch (UnsupportedEncodingException | JsonProcessingException e) {
+            System.err.println("Unable to serialize the packet " + this.getClass());
+            e.printStackTrace();
+        }
+        return payload == null ? new byte[0] : payload;
+    }
+
+    private ServiceData copy() {
+        ServiceData msg = new ServiceData();
+        msg.setServiceName(serviceName);
+        msg.setMessageTypeId(messageTypeId);
+        msg.setMessageId(messageId);
+        return msg;
+    }
 }

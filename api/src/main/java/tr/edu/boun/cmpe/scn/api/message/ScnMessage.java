@@ -8,48 +8,16 @@
 
 package tr.edu.boun.cmpe.scn.api.message;
 
-import tr.edu.boun.cmpe.scn.api.common.ScnBasePacket;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.onlab.packet.BasePacket;
+import org.onlab.packet.IPacket;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlSeeAlso;
-import javax.xml.bind.annotation.XmlType;
+import java.nio.ByteBuffer;
 
-
-/**
- * <p>Java class for ScnMessage complex type.
- * <p>
- * <p>The following schema fragment specifies the expected content contained within this class.
- * <p>
- * <pre>
- * &lt;complexType name="ScnMessage"&gt;
- *   &lt;complexContent&gt;
- *     &lt;restriction base="{http://www.w3.org/2001/XMLSchema}anyType"&gt;
- *       &lt;sequence&gt;
- *         &lt;element name="messageTypeId" type="{}MessageType"/&gt;
- *         &lt;element name="serviceName" type="{}ServiceName"/&gt;
- *       &lt;/sequence&gt;
- *     &lt;/restriction&gt;
- *   &lt;/complexContent&gt;
- * &lt;/complexType&gt;
- * </pre>
- */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "ScnMessage", propOrder = {
-        "messageTypeId",
-        "serviceName"
-})
-@XmlSeeAlso({
-        ServiceUp.class,
-        ServiceProbe.class,
-        ServiceInterest.class,
-        ServiceData.class
-})
-public class ScnMessage extends ScnBasePacket {
+public class ScnMessage extends BasePacket {
 
     protected int messageTypeId;
-    @XmlElement(required = true)
     protected String serviceName;
 
     /**
@@ -84,6 +52,26 @@ public class ScnMessage extends ScnBasePacket {
      */
     public void setServiceName(String value) {
         this.serviceName = value;
+    }
+
+
+    public byte[] serialize() {
+        throw new IllegalStateException("Serialization is not supported");
+    }
+
+    @Override
+    public IPacket deserialize(final byte[] data, final int offset,
+                               final int length) {
+        final ByteBuffer bb = ByteBuffer.wrap(data, offset, length);
+        try {
+            String received = new String(bb.array(), Constants.UTF8);
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(received.trim(), this.getClass());
+        } catch (java.io.IOException e) {
+            System.err.println("Unable to deserialize the packet " + this.getClass());
+            e.printStackTrace();
+        }
+        return null;
     }
 
 }
