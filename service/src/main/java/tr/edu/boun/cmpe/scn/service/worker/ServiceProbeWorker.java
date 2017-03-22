@@ -1,11 +1,14 @@
 package tr.edu.boun.cmpe.scn.service.worker;
 
+import com.google.gson.Gson;
+import tr.edu.boun.cmpe.scn.api.common.Constants;
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
 import tr.edu.boun.cmpe.scn.service.CpuReader;
 import tr.edu.boun.cmpe.scn.service.ScnServer;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.InetAddress;
 
 /**
  * Created by esinka on 1/28/2017.
@@ -35,12 +38,17 @@ public class ServiceProbeWorker extends BaseWorker implements Runnable {
     @Override
     public void run() {
         try {
-            String cpuTime = CpuReader.getInstance().getCpuTime();
-            if (cpuTime != null) {
-                message.setCpuUsage(cpuTime);
-                //reply the probe back
-                reply(message, datagramPacket);
-            }
+            message.setCpuUsage(CpuReader.getCpuTime(server.getCpuResource()));
+            //reply the probe back
+            Gson gson = new Gson();
+            String payload = gson.toJson(message);
+            byte[] data = payload.getBytes(Constants.UTF8);
+
+            InetAddress destAddress = InetAddress.getByName(Constants.SCN_BROADCAST_ADDRESS);
+            int destPort = Constants.SCN_SERVICE_PORT;
+            DatagramPacket packet = new DatagramPacket(data, data.length, destAddress, destPort);
+
+            reply(message, packet);
         } catch (IOException e) {
             System.err.println("Unable to read CPU usage!");
             e.printStackTrace();

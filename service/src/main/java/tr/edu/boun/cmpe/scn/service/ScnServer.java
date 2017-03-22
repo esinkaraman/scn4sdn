@@ -7,13 +7,11 @@ import tr.edu.boun.cmpe.scn.api.common.Tool;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
-import tr.edu.boun.cmpe.scn.api.message.ServiceUp;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceInterestWorker;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceProbeWorker;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceUpWorker;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -32,20 +30,23 @@ public class ScnServer implements Runnable {
 
     private String serviceName;
     private int servicePort;
-    //creating a pool of 20 threads
-    private ExecutorService executor = Executors.newFixedThreadPool(20);
+    private String cpuResource;
+    //creating a pool of 50 threads
+    private ExecutorService executor = Executors.newFixedThreadPool(50);
 
     private boolean keepGoing = true;
 
     private DatagramSocket socket;
 
-    public ScnServer(String srcIp, int servicePort, String serviceName) throws SocketException, UnknownHostException {
+    public ScnServer(String srcIp, int servicePort, String serviceName, String cpuResource) throws SocketException, UnknownHostException {
         Tool.checkNull(srcIp, "Source IP address can not be null");
         Tool.checkNull(serviceName, "Service name can not be null");
+        Tool.checkNull(cpuResource, "CpuResource can not be null");
         SocketAddress socketAddress = new InetSocketAddress(InetAddress.getByName(srcIp), servicePort);
         socket = new DatagramSocket(socketAddress);
         this.servicePort = servicePort;
         this.serviceName = serviceName;
+        this.cpuResource = cpuResource;
     }
 
     @Override
@@ -58,7 +59,7 @@ public class ScnServer implements Runnable {
             try {
                 DatagramPacket received = receive();
                 getAndProcessData(received);
-            } catch (IOException|RuntimeException e) {
+            } catch (IOException | RuntimeException e) {
                 System.err.println("Can not receive packet due to the exception:" + e.toString());
                 e.printStackTrace();
                 continue;
@@ -77,7 +78,6 @@ public class ScnServer implements Runnable {
 
     private ScnMessage getAndProcessData(DatagramPacket packet) throws UnsupportedEncodingException {
         String data = new String(packet.getData(), Constants.UTF8).trim();
-        System.out.println("-->received: " + data);
         Gson gson = gson();
         ScnMessage scnMessage = gson.fromJson(data.trim(), ScnMessage.class);
 
@@ -85,12 +85,12 @@ public class ScnServer implements Runnable {
         switch (scnMessageType) {
             case INTEREST:
                 ServiceInterest interest = gson.fromJson(data, ServiceInterest.class);
-                System.out.println("ServiceInterest received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
+                System.out.println("SERVICE INTEREST received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
                 executor.submit(new ServiceInterestWorker(this, interest, packet));
                 break;
             case PROBE:
                 ServiceProbe probe = gson().fromJson(data, ServiceProbe.class);
-                System.out.println("ServiceProbe received:" + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(probe));
+                System.out.println("PROBE received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(probe));
                 executor.submit(new ServiceProbeWorker(this, probe, packet));
                 break;
             default:
@@ -124,6 +124,10 @@ public class ScnServer implements Runnable {
 
     public int getServicePort() {
         return servicePort;
+    }
+
+    public String getCpuResource() {
+        return cpuResource;
     }
 }
 

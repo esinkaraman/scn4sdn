@@ -26,6 +26,15 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/java</directory>
+                <filtering>true</filtering>
+                <excludes>
+                    <exclude>**/*.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -34,6 +43,7 @@
                     <archive>
                         <manifest>
                             <mainClass>tr.edu.boun.cmpe.scn.service.Init</mainClass>
+                            <mainClass>tr.edu.boun.cmpe.scn.service.CpuTest</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
