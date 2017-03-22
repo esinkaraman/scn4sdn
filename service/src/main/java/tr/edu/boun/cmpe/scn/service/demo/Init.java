@@ -1,4 +1,6 @@
-package tr.edu.boun.cmpe.scn.service;
+package tr.edu.boun.cmpe.scn.service.demo;
+
+import tr.edu.boun.cmpe.scn.service.ScnServer;
 
 /**
  * Created by esinka on 1/28/2017.
@@ -36,7 +38,7 @@ public class Init {
             return;
         }
 
-        server = new ScnServer(srcIp, Integer.parseInt(servicePort), serviceName, cpuResource);
+        server = new ScnServer(srcIp, Integer.parseInt(servicePort), serviceName, cpuResource, new InterestListener());
         server.run();
     }
 }

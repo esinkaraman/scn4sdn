@@ -42,8 +42,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>tr.edu.boun.cmpe.scn.service.Init</mainClass>
-                            <mainClass>tr.edu.boun.cmpe.scn.service.CpuTest</mainClass>
+                            <mainClass>tr.edu.boun.cmpe.scn.service.demo.Init</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

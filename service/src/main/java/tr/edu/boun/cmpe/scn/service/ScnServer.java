@@ -7,6 +7,7 @@ import tr.edu.boun.cmpe.scn.api.common.Tool;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
+import tr.edu.boun.cmpe.scn.service.worker.IServiceInterestListener;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceInterestWorker;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceProbeWorker;
 import tr.edu.boun.cmpe.scn.service.worker.ServiceUpWorker;
@@ -31,6 +32,7 @@ public class ScnServer implements Runnable {
     private String serviceName;
     private int servicePort;
     private String cpuResource;
+    private IServiceInterestListener interestListener;
     //creating a pool of 50 threads
     private ExecutorService executor = Executors.newFixedThreadPool(50);
 
@@ -38,15 +40,17 @@ public class ScnServer implements Runnable {
 
     private DatagramSocket socket;
 
-    public ScnServer(String srcIp, int servicePort, String serviceName, String cpuResource) throws SocketException, UnknownHostException {
+    public ScnServer(String srcIp, int servicePort, String serviceName, String cpuResource, IServiceInterestListener interestListener) throws SocketException, UnknownHostException {
         Tool.checkNull(srcIp, "Source IP address can not be null");
         Tool.checkNull(serviceName, "Service name can not be null");
         Tool.checkNull(cpuResource, "CpuResource can not be null");
+        Tool.checkNull(interestListener, "Interest listener can not be null");
         SocketAddress socketAddress = new InetSocketAddress(InetAddress.getByName(srcIp), servicePort);
         socket = new DatagramSocket(socketAddress);
         this.servicePort = servicePort;
         this.serviceName = serviceName;
         this.cpuResource = cpuResource;
+        this.interestListener = interestListener;
     }
 
     @Override
@@ -128,6 +132,10 @@ public class ScnServer implements Runnable {
 
     public String getCpuResource() {
         return cpuResource;
+    }
+
+    public IServiceInterestListener getInterestListener() {
+        return interestListener;
     }
 }
 

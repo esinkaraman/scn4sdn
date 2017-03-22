@@ -24,7 +24,8 @@ public class ServiceInterestWorker extends BaseWorker implements Runnable {
     @Override
     public void run() {
         //reply response
-        ServiceData serviceData = prepareResponse(message);
+        //ServiceData serviceData = prepareResponse(message);
+        ServiceData serviceData = server.getInterestListener().processInterest(message);
         reply(serviceData, datagramPacket);
     }
 
