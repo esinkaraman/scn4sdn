@@ -8,5 +8,5 @@ public class Constants {
     public static final int SCN_SERVICE_PORT = 1743;
     public static final String SCN_BROADCAST_ADDRESS = "255.255.255.255";
     public static final String UTF8 = "UTF-8";
-    public static final int PACKET_SIZE = 4096;
+    public static final int PACKET_SIZE = 4096 * 3;
 }
