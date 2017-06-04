@@ -1,6 +1,8 @@
 package tr.edu.boun.cmpe.scn.service;
 
 import com.google.gson.Gson;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import tr.edu.boun.cmpe.scn.api.common.Constants;
 import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
 import tr.edu.boun.cmpe.scn.api.common.Tool;
@@ -21,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -28,19 +31,25 @@ import java.util.concurrent.Executors;
  * Created by esinka on 1/28/2017.
  */
 public class ScnServer implements Runnable {
+    private static final Logger log = LogManager.getLogger(ScnServer.class.getName());
+
+    SimpleDateFormat format;
+    static final String DATE_PATTERN = "yyyy-mm-dd HH:mm:ss.SSS";
 
     private String serviceName;
     private int servicePort;
+    private String srcIp;
     private String cpuResource;
     private IServiceInterestListener interestListener;
     //creating a pool of 50 threads
-    private ExecutorService executor = Executors.newFixedThreadPool(50);
+    private ExecutorService executor = Executors.newFixedThreadPool(57);
 
     private boolean keepGoing = true;
 
     private DatagramSocket socket;
 
     public ScnServer(String srcIp, int servicePort, String serviceName, String cpuResource, IServiceInterestListener interestListener) throws SocketException, UnknownHostException {
+        System.out.println("ScrIp:" + srcIp + " servicePort:" + servicePort + " serviceName:" + serviceName);
         Tool.checkNull(srcIp, "Source IP address can not be null");
         Tool.checkNull(serviceName, "Service name can not be null");
         Tool.checkNull(cpuResource, "CpuResource can not be null");
@@ -49,6 +58,7 @@ public class ScnServer implements Runnable {
         socket = new DatagramSocket(socketAddress);
         this.servicePort = servicePort;
         this.serviceName = serviceName;
+        this.srcIp = srcIp;
         this.cpuResource = cpuResource;
         this.interestListener = interestListener;
     }
@@ -89,7 +99,10 @@ public class ScnServer implements Runnable {
         switch (scnMessageType) {
             case INTEREST:
                 ServiceInterest interest = gson.fromJson(data, ServiceInterest.class);
-                System.out.println("SERVICE INTEREST received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
+
+                log.info("{}", Tool.logForService(srcIp, packet.getAddress().toString()));
+                System.out.println(formatTime() + " SERVICE INTEREST received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
+
                 executor.submit(new ServiceInterestWorker(this, interest, packet));
                 break;
             case PROBE:
@@ -116,6 +129,11 @@ public class ScnServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    String formatTime() {
+        SimpleDateFormat format = new SimpleDateFormat(DATE_PATTERN);
+        return format.format(System.currentTimeMillis());
     }
 
     private Gson gson() {

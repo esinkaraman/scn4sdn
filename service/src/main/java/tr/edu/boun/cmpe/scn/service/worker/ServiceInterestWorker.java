@@ -1,6 +1,5 @@
 package tr.edu.boun.cmpe.scn.service.worker;
 
-import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
 import tr.edu.boun.cmpe.scn.api.message.ServiceData;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
 import tr.edu.boun.cmpe.scn.service.ScnServer;
@@ -23,18 +22,14 @@ public class ServiceInterestWorker extends BaseWorker implements Runnable {
 
     @Override
     public void run() {
-        //reply response
-        //ServiceData serviceData = prepareResponse(message);
-        ServiceData serviceData = server.getInterestListener().processInterest(message);
-        reply(serviceData, datagramPacket);
+        try {
+            ServiceData serviceData = server.getInterestListener().processInterest(message);
+            if (serviceData != null) {
+                reply(serviceData, datagramPacket);
+            }
+        } catch (Exception e) {
+            System.err.println("Unable to process service interest");
+            e.printStackTrace();
+        }
     }
-
-    private ServiceData prepareResponse(ServiceInterest interest) {
-        ServiceData serviceData = new ServiceData();
-        serviceData.setServiceName(interest.getServiceName());
-        serviceData.setMessageTypeId(ScnMessageType.DATA.getId());
-        serviceData.setMessageId(interest.getMessageId());
-        return serviceData;
-    }
-
 }
