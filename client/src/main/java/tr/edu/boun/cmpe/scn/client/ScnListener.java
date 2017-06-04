@@ -2,6 +2,7 @@ package tr.edu.boun.cmpe.scn.client;
 
 import com.google.gson.Gson;
 import tr.edu.boun.cmpe.scn.api.common.Constants;
+import tr.edu.boun.cmpe.scn.api.common.Tool;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 
 import java.net.DatagramPacket;
@@ -35,7 +36,7 @@ public class ScnListener implements Runnable {
                 datagramSocket.receive(inboundBasePacket);
                 String received = new String(inboundBasePacket.getData(), Constants.UTF8);
 
-                System.out.println("ServiceData received via " + datagramSocket.getLocalSocketAddress() + " Payload=" + received.trim());
+                System.out.println(Tool.formatTime() + " ServiceData received via " + datagramSocket.getLocalSocketAddress() + " Payload=" + received.trim());
 
                 ScnMessage scnMessage = gson.fromJson(received.trim(), ScnMessage.class);
                 client.received(scnMessage, received.trim());
@@ -49,5 +50,6 @@ public class ScnListener implements Runnable {
 
     void stop() {
         keepContinuing = false;
+        client.getSocket().close();
     }
 }

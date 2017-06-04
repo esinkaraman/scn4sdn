@@ -7,5 +7,5 @@ import tr.edu.boun.cmpe.scn.api.message.ServiceData;
  */
 public interface IScnListener {
 
-    void received(ServiceData serviceData);
+    void received(ServiceData serviceData, String ipAddressClient);
 }

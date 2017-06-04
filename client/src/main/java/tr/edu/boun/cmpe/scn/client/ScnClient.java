@@ -27,6 +27,7 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
 
     private static ConcurrentHashMap<String, ScnClient> serviceNameToInstanceMap = new ConcurrentHashMap<>();
     private String serviceName;
+    private String srcIpAddress;
     private DatagramSocket socket;
     private ConcurrentHashMap<String, IScnListener> messageIdToListener;
     private ScnListener scnListener;
@@ -38,6 +39,7 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
 
     private ScnClient(String serviceName, String srcIpAddress) throws UnknownHostException, SocketException {
         this.serviceName = serviceName;
+        this.srcIpAddress = srcIpAddress;
         int srcPort = CyclicCounter.getInstance().cyclicallyIncrementAndGet();
         SocketAddress socketAddress = new InetSocketAddress(InetAddress.getByName(srcIpAddress), srcPort);
         socket = new DatagramSocket(socketAddress);
@@ -81,8 +83,8 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
     @Override
     public void send(ServiceInterest interest, IScnListener listener) throws IOException {
         checkParameters(interest);
+        messageIdToListener.put(interest.getMessageId().trim(), listener);
         send(interest);
-        messageIdToListener.put(interest.getMessageId(), listener);
     }
 
     private void checkParameters(ServiceInterest interest) {
@@ -94,9 +96,6 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
 
     @Override
     public void close() {
-        if (socket != null) {
-            socket.close();
-        }
         scnListener.stop();
         executorService.shutdown();
     }
@@ -125,12 +124,13 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
 
     private void serviceDataReceived(String payload) {
         ServiceData serviceData = gson.fromJson(payload, ServiceData.class);
-        IScnListener iScnListener = messageIdToListener.get(serviceData.getMessageId());
+        IScnListener iScnListener = messageIdToListener.get(serviceData.getMessageId().trim());
         if (iScnListener == null) {
             System.out.println("No listener found for ServiceData!!! " + payload);
             return;
         }
-        iScnListener.received(serviceData);
+        iScnListener.received(serviceData, srcIpAddress);
+        messageIdToListener.remove(serviceData.getMessageId().trim());
     }
 
 }

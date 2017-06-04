@@ -20,16 +20,20 @@ public class TestInterest {
     }
 
     public void sendInterest(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage: <IP Address>");
+        if (args.length < 2) {
+            System.out.println("Usage: <IP Address> <Service Name>");
             return;
         }
         if (args[0] == null) {
             System.out.println("IP address must be given.");
             return;
         }
+        if (args[1] == null) {
+            System.out.println("Service name must be given.");
+            return;
+        }
         String address = args[0];
-        String serviceName = "s1";
+        String serviceName = args[1];
         ServiceInterest interest = new ServiceInterest();
         interest.setMessageTypeId(ScnMessageType.INTEREST.getId());
         interest.setServiceName(serviceName);
@@ -56,7 +60,7 @@ public class TestInterest {
     public class ResponseListener implements IScnListener {
 
         @Override
-        public void received(ServiceData serviceData) {
+        public void received(ServiceData serviceData, String ipAddressClient) {
             System.out.println("ServiceData received:" + serviceData);
 
             if (client != null) {
