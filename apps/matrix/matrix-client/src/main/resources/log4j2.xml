@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="debug" strict="true" name="XMLConfigTest" packages="tr.edu.boun.cmpe.scn">
+    <Properties>
+        <Property name="matrix_client">/scn/topo/matrix/log4j/matrixclient.log</Property>
+    </Properties>
+
+    <Appenders>
+        <Appender type="File" name="File" fileName="${matrix_client}">
+            <Layout type="PatternLayout">
+                <Pattern>%m%n</Pattern>
+            </Layout>
+        </Appender>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="tr.edu.boun.cmpe.scn.app.matrix.client" level="debug" additivity="true">
+            <AppenderRef ref="File"/>
+        </Logger>
+    </Loggers>
+
+</Configuration>
