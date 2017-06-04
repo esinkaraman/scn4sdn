@@ -113,9 +113,9 @@ public class ServiceInfo implements Cloneable {
         sb.append(", port=").append(port);
         sb.append(", deviceId='").append(deviceId).append('\'');
         sb.append(", devicePort=").append(devicePort);
-        sb.append(", hostId=").append(hostId);
         sb.append(", lastCpuUsageValue=").append(format(lastCpuUsageValue));
         sb.append(", cpuUsage=").append(format(cpuUsage));
+        sb.append(", hostId=").append(hostId);
         sb.append(", lastReceivedProbeTime=").append(lastReceivedProbeTime);
         sb.append('}');
         return sb.toString();

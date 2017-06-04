@@ -59,6 +59,7 @@ import tr.edu.boun.cmpe.scn.api.message.ServiceData;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
 import tr.edu.boun.cmpe.scn.api.message.ServiceProbe;
 import tr.edu.boun.cmpe.scn.api.message.ServiceUp;
+import tr.edu.boun.cmpe.scn.probelog.ProbeLogger;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -74,6 +75,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -88,7 +90,7 @@ public class ScnController implements ScnService {
 
     private static final int DEFAULT_PRIORITY = 10;
     private static final int DEFAULT_TIMEOUT = 10;
-    private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 5000;
+    private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 9000;
     private static final String SENDER_MAC_ADDRESS = "00:00:00:00:00:01";
 
     private static byte packetTTL = (byte) 127;
@@ -123,7 +125,7 @@ public class ScnController implements ScnService {
     private ApplicationId appId;
     ScnPacketProcessor processor = new ScnPacketProcessor();
     HostListener hostListener = new InternalHostListener();
-
+    //for flow rules
     int hardTimeoutSecs = 10;
 
     ScheduledExecutorService scheduler;
@@ -282,7 +284,7 @@ public class ScnController implements ScnService {
             }
 
             if (EthType.EtherType.lookup(eth.getEtherType()).equals(EthType.EtherType.IPV4)) {
-                //log.info("-> RECEIVED: {} src={} dst={}", context.inPacket().receivedFrom(), eth.getSourceMAC(), eth.getDestinationMAC());
+                log.info("-> RECEIVED: {} src={} dst={}", context.inPacket().receivedFrom(), eth.getSourceMAC(), eth.getDestinationMAC());
                 try {
                     if (isScnMessage(context.inPacket().receivedFrom(), eth)) {
                         IPv4 iPv4 = (IPv4) eth.getPayload();
@@ -293,9 +295,15 @@ public class ScnController implements ScnService {
                         //ObjectMapper mapper = new ObjectMapper();
                         String payload = getPayload(udp.getPayload());
                         log.info("--> SCN message received from {}. {}", context.inPacket().receivedFrom(), payload);
+
                         Gson mapper = new Gson();
+                        ScnMessageType scnMessageType;
+                        /*if(payload.indexOf("data") != -1) {
+                            log.info("----> SCN data received. Just returning...");
+                            scnMessageType = ScnMessageType.DATA;
+                        } else {*/
                         ScnMessage scnMessage = mapper.fromJson(payload, ScnMessage.class);
-                        ScnMessageType scnMessageType = ScnMessageType.valueOf(scnMessage.getMessageTypeId());
+                        scnMessageType = ScnMessageType.valueOf(scnMessage.getMessageTypeId());
 
                         switch (scnMessageType) {
                             case UP:
@@ -309,8 +317,8 @@ public class ScnController implements ScnService {
                                 context.block();
                                 break;
                             case DATA:
-                                ServiceData data = mapper.fromJson(payload, ServiceData.class);
-                                processServiceData(context, data);
+                                //ServiceData data = mapper.fromJson(payload, ServiceData.class);
+                                processServiceData(context, null);
                                 context.block();
                                 break;
                             case PROBE:
@@ -341,17 +349,18 @@ public class ScnController implements ScnService {
                     udp.getDestinationPort() == Constants.SCN_SERVICE_PORT ||
                     udp.getDestinationPort() == Constants.SCN_CLIENT_PORT ||
                     fromService(connectPoint, eth, udp.getSourcePort());
-        } else if (iPv4.getProtocol() == IPv4.PROTOCOL_UDP) {
+        } /*else if (iPv4.getProtocol() == IPv4.PROTOCOL_UDP) {
             UDP udp = (UDP) iPv4.getPayload();
             //coming from a live service instance?
             return fromService(connectPoint, eth, udp.getSourcePort());
-        }
+        }*/
         return false;
     }
 
     boolean fromService(ConnectPoint connectPoint, Ethernet ethernet, int srcUdpPort) {
         String locationKey = FlowUtils.buildServiceLocationKey(connectPoint.deviceId(), connectPoint.port(), ethernet.getSourceMAC(), srcUdpPort);
         ServiceInfo serviceInfo = serviceLocationToInstanceMap.get(locationKey);
+        log.info("HAVING RECEIVED: {} srcMac:{} scrUdp:{} locationKey:{} fromService:{}", connectPoint, ethernet.getSourceMAC(), srcUdpPort, locationKey, (serviceInfo == null ? false : true));
         return serviceInfo == null ? false : true;
     }
 
@@ -422,8 +431,10 @@ public class ScnController implements ScnService {
         } else {
             Path path = findPath(context, dst);
             if (path == null) {
-                log.warn("No path found for ServiceData! for Src:{} to dst:{} and Service:{}",
-                         ethernet.getSourceMAC(), ethernet.getDestinationMAC(), data.getServiceName());
+                //log.warn("No path found for ServiceData! for Src:{} to dst:{} and Service:{}",
+                //ethernet.getSourceMAC(), ethernet.getDestinationMAC(), data.getServiceName());
+                log.warn("No path found for ServiceData! for Src:{} to dst:{}",
+                         ethernet.getSourceMAC(), ethernet.getDestinationMAC());
                 return;
             }
             serviceComparable.setPath(path);
@@ -451,10 +462,25 @@ public class ScnController implements ScnService {
 
         //sort the list into ascending order considering distance
         Collections.sort(comparableServiceList);
-        log.info("Available service list after sorting: {}", comparableServiceList);
-        //get the closest one
-        ServiceComparable serviceComparable = comparableServiceList.get(0);
-        installPath(context, serviceComparable, true);
+        //log.info("Available service list after sorting: {}", comparableServiceList);
+        //get the nicest one
+
+        int minDistance = comparableServiceList.get(0).getDistance();
+        List<ServiceComparable> closestServices = new ArrayList<>();
+        for (ServiceComparable s : comparableServiceList) {
+            if (s.getDistance() == minDistance) {
+                closestServices.add(s);
+            }
+        }
+
+        int randomlyFromRange = getRandomlyFromRange(0, closestServices.size() - 1);
+
+        //ServiceComparable serviceComparable = comparableServiceList.get(0);
+        installPath(context, closestServices.get(randomlyFromRange), true);
+    }
+
+    int getRandomlyFromRange(int rangeStart, int rangeEnd) {
+        return ThreadLocalRandom.current().nextInt(rangeStart, rangeEnd + 1);
     }
 
 
@@ -490,7 +516,8 @@ public class ScnController implements ScnService {
 
         SelectorValue value = pathIds.get(selectorValue.getKey());
         if (value != null) {
-            log.info("Path already added. Doing nothing. {}", selectorValue.getKey());
+            log.info("Path already added. Sending to TABLE port. {}", selectorValue.getKey());
+            packetOut(context, PortNumber.TABLE);
             return;
         }
 
@@ -844,6 +871,7 @@ public class ScnController implements ScnService {
             if (cpuUsage != null) {
                 service.setLastCpuUsageValue(cpuUsage);
                 service.setLastReceivedProbeTime(System.currentTimeMillis());
+                ProbeLogger.logCpuUsage(service.getCpuUsage(), service.getHostId().mac().toString());
             }
         }
     }
