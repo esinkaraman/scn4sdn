@@ -1,4 +1,4 @@
-package tr.edu.boun.cmpe.scn;
+package tr.edu.boun.cmpe.scn.api.common;
 
 /**
  * Created by esinka on 1/6/2017.

@@ -1,4 +1,4 @@
-package tr.edu.boun.cmpe.scn;
+package tr.edu.boun.cmpe.scn.api.common;
 
 import org.onosproject.net.HostId;
 

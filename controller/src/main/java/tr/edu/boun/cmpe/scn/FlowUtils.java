@@ -20,6 +20,7 @@ import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.slf4j.Logger;
 import tr.edu.boun.cmpe.scn.api.common.Constants;
+import tr.edu.boun.cmpe.scn.api.common.ServiceInfo;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -101,6 +102,24 @@ public class FlowUtils {
         return Ip4Prefix.valueOf(ipAddress, Ip4Prefix.MAX_MASK_LENGTH);
     }
 
+    public static void populateTreatment(TrafficTreatment.Builder treatmentBuilder, boolean interest, MacAddress dstMac, IpAddress dstAddress,
+                                         int udpDstPort, PortNumber outPort) {
+        if(interest) {
+            treatmentBuilder
+                    .setEthDst(dstMac)
+                    .setIpDst(dstAddress)
+                    .setUdpDst(TpPort.tpPort(udpDstPort))
+                    .setOutput(outPort);
+        } else {
+            //data
+            treatmentBuilder
+                    //.setEthSrc(MacAddress.BROADCAST)
+                    //.setIpSrc(IpAddress.valueOf(SCN_DST_IP_V4))
+                    .setUdpSrc(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
+                    .setOutput(outPort);
+        }
+    }
+
     public static void handleFirstEdgeSwitch(Ethernet eth, TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,
                                              MacAddress srcMac, MacAddress dstMac,
                                              PortNumber inPort, PortNumber outPort, IpAddress srcAddress,
@@ -116,12 +135,6 @@ public class FlowUtils {
                     .matchUdpDst(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
                     .matchUdpSrc(TpPort.tpPort(udpSrcPort));
 
-            treatmentBuilder
-                    .setEthDst(dstMac)
-                    .setIpDst(dstAddress)
-                    .setUdpDst(TpPort.tpPort(udpDstPort))
-                    .setOutput(outPort);
-
         } else {
             //service data
             selectorBuilder.matchInPort(inPort)
@@ -133,13 +146,8 @@ public class FlowUtils {
                     .matchIPProtocol(IPv4.PROTOCOL_UDP)
                     .matchUdpDst(TpPort.tpPort(udpDstPort))
                     .matchUdpSrc(TpPort.tpPort(udpSrcPort));
-
-            treatmentBuilder
-                    //.setEthSrc(MacAddress.BROADCAST)
-                    //.setIpSrc(IpAddress.valueOf(SCN_DST_IP_V4))
-                    .setUdpSrc(TpPort.tpPort(Constants.SCN_SERVICE_PORT))
-                    .setOutput(outPort);
         }
+        populateTreatment(treatmentBuilder,interest,dstMac,dstAddress,udpDstPort,outPort);
     }
 
     public static void handleCenterSwitch(TrafficSelector.Builder selectorBuilder, TrafficTreatment.Builder treatmentBuilder,

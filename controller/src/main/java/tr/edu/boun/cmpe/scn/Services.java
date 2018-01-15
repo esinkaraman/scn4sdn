@@ -3,6 +3,7 @@ package tr.edu.boun.cmpe.scn;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.slf4j.Logger;
+import tr.edu.boun.cmpe.scn.api.common.ServiceInfo;
 
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;

@@ -124,13 +124,12 @@ public class ScnClient extends AbstractScnClient implements IScnClient {
 
     private void serviceDataReceived(String payload) {
         ServiceData serviceData = gson.fromJson(payload, ServiceData.class);
-        IScnListener iScnListener = messageIdToListener.get(serviceData.getMessageId().trim());
+        IScnListener iScnListener = messageIdToListener.remove(serviceData.getMessageId().trim());
         if (iScnListener == null) {
             System.out.println("No listener found for ServiceData!!! " + payload);
             return;
         }
         iScnListener.received(serviceData, srcIpAddress);
-        messageIdToListener.remove(serviceData.getMessageId().trim());
     }
 
 }

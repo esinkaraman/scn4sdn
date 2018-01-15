@@ -42,10 +42,11 @@ public class ScnServer implements Runnable {
     private String cpuResource;
     private IServiceInterestListener interestListener;
     //creating a pool of 50 threads
-    private ExecutorService executor = Executors.newFixedThreadPool(57);
+    private ExecutorService executor = Executors.newFixedThreadPool(48);
+    private ExecutorService executorForDispatcher = Executors.newFixedThreadPool(32);
 
     private boolean keepGoing = true;
-
+    private Gson gson = new Gson();
     private DatagramSocket socket;
 
     public ScnServer(String srcIp, int servicePort, String serviceName, String cpuResource, IServiceInterestListener interestListener) throws SocketException, UnknownHostException {
@@ -72,7 +73,7 @@ public class ScnServer implements Runnable {
         while (keepGoing) {
             try {
                 DatagramPacket received = receive();
-                getAndProcessData(received);
+                executorForDispatcher.submit(new Dispatcher(received));
             } catch (IOException | RuntimeException e) {
                 System.err.println("Can not receive packet due to the exception:" + e.toString());
                 e.printStackTrace();
@@ -100,10 +101,10 @@ public class ScnServer implements Runnable {
             case INTEREST:
                 ServiceInterest interest = gson.fromJson(data, ServiceInterest.class);
 
-                log.info("{}", Tool.logForService(srcIp, packet.getAddress().toString()));
-                System.out.println(formatTime() + " SERVICE INTEREST received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
+                //log.info("{}", Tool.logForService(srcIp, packet.getAddress().toString()));
+                //System.out.println(formatTime() + " SERVICE INTEREST received from " + packet.getAddress() + ":" + packet.getPort() + " Data:" + gson.toJson(interest));
 
-                executor.submit(new ServiceInterestWorker(this, interest, packet));
+                executor.submit(new ServiceInterestWorker(this, interest, packet, srcIp));
                 break;
             case PROBE:
                 ServiceProbe probe = gson().fromJson(data, ServiceProbe.class);
@@ -125,9 +126,9 @@ public class ScnServer implements Runnable {
         DatagramPacket dp = new DatagramPacket(message.getBytes(), message.getBytes().length, address, port);
         try {
             socket.send(dp);
-            System.out.println("Sent to " + address + ":" + port + " Message:" + message);
+            //System.out.println("Sent to " + address + ":" + port + " Message:" + message);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Exception during sending ServiceData. e:" + e.getMessage());
         }
     }
 
@@ -137,7 +138,26 @@ public class ScnServer implements Runnable {
     }
 
     private Gson gson() {
+        //return gson;
         return new Gson();
+    }
+
+    private class Dispatcher implements Runnable {
+        private DatagramPacket packet;
+
+        public Dispatcher(DatagramPacket packet) {
+            this.packet = packet;
+        }
+
+        @Override
+        public void run() {
+            try {
+                getAndProcessData(packet);
+            } catch (Exception e) {
+                log.error("Failed to dispatch received packet!", e);
+                e.printStackTrace();
+            }
+        }
     }
 
     public String getServiceName() {

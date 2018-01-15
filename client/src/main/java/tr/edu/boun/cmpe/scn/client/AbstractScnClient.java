@@ -63,9 +63,9 @@ public abstract class AbstractScnClient {
         DatagramSocket datagramSocket = getSocket();
 
         System.out.println(formatTime() + " Sending ServiceInterest via " + datagramSocket.getLocalSocketAddress() + " Payload=" + payload);
-        synchronized (mutex) {
+        //synchronized (mutex) {
             datagramSocket.send(packet);
-        }
+        //}
     }
 
     String formatTime() {

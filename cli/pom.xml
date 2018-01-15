@@ -18,6 +18,12 @@
             <artifactId>org.apache.karaf.shell.console</artifactId>
             <version>3.0.5</version>
         </dependency>
+
+        <dependency>
+            <groupId>scn</groupId>
+            <artifactId>scn-api</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
 
 </project>

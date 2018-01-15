@@ -54,6 +54,8 @@ import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import tr.edu.boun.cmpe.scn.api.common.Constants;
 import tr.edu.boun.cmpe.scn.api.common.ScnMessageType;
+import tr.edu.boun.cmpe.scn.api.common.ScnService;
+import tr.edu.boun.cmpe.scn.api.common.ServiceInfo;
 import tr.edu.boun.cmpe.scn.api.message.ScnMessage;
 import tr.edu.boun.cmpe.scn.api.message.ServiceData;
 import tr.edu.boun.cmpe.scn.api.message.ServiceInterest;
@@ -89,9 +91,12 @@ public class ScnController implements ScnService {
     private final Logger log = getLogger(getClass());
 
     private static final int DEFAULT_PRIORITY = 10;
-    private static final int DEFAULT_TIMEOUT = 10;
+    private static final int DEFAULT_TIMEOUT = 20;
     private static final int DEFAULT_PROBE_PERIOD_MILLISECONDS = 9000;
     private static final String SENDER_MAC_ADDRESS = "00:00:00:00:00:01";
+
+    //for flow rules
+    static final int HARD_FLOW_TIMEOUT = 20;
 
     private static byte packetTTL = (byte) 127;
 
@@ -120,13 +125,15 @@ public class ScnController implements ScnService {
     @Property(name = "ipAddress", value = "10.0.0.190", label = "ipAddress value; default is 10.0.0.190")
     private String ipAddress = "10.0.0.190";
 
+    @Property(name = "hardTimeoutSecs", intValue = HARD_FLOW_TIMEOUT, label = "Configure hard flow timeout in seconds.")
+    private int hardTimeoutSecs = HARD_FLOW_TIMEOUT;
+
     private static final int PROBE_EXPIRATION_MILLISECONDS = 15000;
 
     private ApplicationId appId;
     ScnPacketProcessor processor = new ScnPacketProcessor();
     HostListener hostListener = new InternalHostListener();
-    //for flow rules
-    int hardTimeoutSecs = 10;
+
 
     ScheduledExecutorService scheduler;
 
@@ -194,6 +201,14 @@ public class ScnController implements ScnService {
             probeEnabled = probeEnabledCfg;
             log.info("Configured.probeEnabled is {}", probeEnabled ? "enabled" : "disabled");
         }
+
+        Integer hardTimeoutSecs = Tools.getIntegerProperty(properties, "hardTimeoutSecs");
+        if (hardTimeoutSecs == null) {
+            this.hardTimeoutSecs = HARD_FLOW_TIMEOUT;
+        } else {
+            this.hardTimeoutSecs = hardTimeoutSecs;
+        }
+        log.info("hardTimeoutSecs is set to {}", this.hardTimeoutSecs);
     }
 
     @Modified
@@ -229,8 +244,8 @@ public class ScnController implements ScnService {
         Set<ServiceInfo> serviceSet = new HashSet<>();
         Collection<Services> values = serviceNameToInstancesMap.values();
         values.forEach(services1 -> {
-                           services1.getServices().forEach(serviceInfo -> serviceSet.add(serviceInfo));
-                       }
+                    services1.getServices().forEach(serviceInfo -> serviceSet.add(serviceInfo));
+                }
         );
         return serviceSet;
     }
@@ -366,7 +381,7 @@ public class ScnController implements ScnService {
 
     private void processServiceUp(PacketContext context, ServiceUp payload) {
         log.info("SERVICE UP message received. SERVICE NAME={}, PORT={}, Src MAC={}",
-                 payload.getServiceName(), payload.getServicePort(), context.inPacket().parsed().getSourceMAC());
+                payload.getServiceName(), payload.getServicePort(), context.inPacket().parsed().getSourceMAC());
 
         ConnectPoint connectPoint = context.inPacket().receivedFrom();
         HostId hostId = HostId.hostId(context.inPacket().parsed().getSourceMAC());
@@ -434,7 +449,7 @@ public class ScnController implements ScnService {
                 //log.warn("No path found for ServiceData! for Src:{} to dst:{} and Service:{}",
                 //ethernet.getSourceMAC(), ethernet.getDestinationMAC(), data.getServiceName());
                 log.warn("No path found for ServiceData! for Src:{} to dst:{}",
-                         ethernet.getSourceMAC(), ethernet.getDestinationMAC());
+                        ethernet.getSourceMAC(), ethernet.getDestinationMAC());
                 return;
             }
             serviceComparable.setPath(path);
@@ -483,6 +498,19 @@ public class ScnController implements ScnService {
         return ThreadLocalRandom.current().nextInt(rangeStart, rangeEnd + 1);
     }
 
+    private TrafficTreatment getTreatmentForPacketOut(ServiceComparable serviceComparable, boolean interest, MacAddress dstMac, IpAddress dstAddress,
+                                                              int udpDstPort, PortNumber destinationPort) {
+        TrafficTreatment.Builder treatmentBuilder = DefaultTrafficTreatment.builder();
+        if (serviceComparable.getDistance() == 0) {
+            //first switch
+            FlowUtils.populateTreatment(treatmentBuilder, interest, dstMac, dstAddress, udpDstPort, destinationPort);
+        } else {
+            Path path = serviceComparable.getPath();
+            Link link = path.links().get(0);
+            FlowUtils.populateTreatment(treatmentBuilder, interest, dstMac, dstAddress, udpDstPort, link.src().port());
+        }
+        return treatmentBuilder.build();
+    }
 
     private void installPath(PacketContext context, ServiceComparable serviceComparable, boolean interest) {
         Ethernet eth = context.inPacket().parsed();
@@ -646,7 +674,7 @@ public class ScnController implements ScnService {
                 Path path = findPath(context, serviceHost);
                 if (path == null) {
                     log.warn("No path found for Src:{} to dst:{} and Service:{}",
-                             context.inPacket().parsed().getSourceMAC(), serviceHost.mac(), serviceInfo.getName());
+                            context.inPacket().parsed().getSourceMAC(), serviceHost.mac(), serviceInfo.getName());
                     continue;
                 }
                 serviceComparable.setDistance(path.links().size());

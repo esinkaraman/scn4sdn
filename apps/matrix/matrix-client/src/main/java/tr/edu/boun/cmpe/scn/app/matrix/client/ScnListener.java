@@ -25,7 +25,7 @@ public class ScnListener implements IScnListener {
     public void received(ServiceData serviceData, String ipAddressClient) {
         long elapsed = System.nanoTime() - start;
 
-        log.info(Tool.elapsedLogForClient(elapsed, ipAddressClient));
+        //log.info(Tool.elapsedLogForClient(elapsed, ipAddressClient));
 
         System.out.println("Data: messageId:" + serviceData.getMessageId() +
                                    " elapsed:" + elapsed +

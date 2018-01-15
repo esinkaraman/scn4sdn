@@ -2,6 +2,7 @@ package tr.edu.boun.cmpe.scn;
 
 import org.onosproject.net.Host;
 import org.onosproject.net.Path;
+import tr.edu.boun.cmpe.scn.api.common.ServiceInfo;
 
 /**
  * Created by esinka on 2/6/2017.

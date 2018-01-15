@@ -3,9 +3,8 @@ package tr.edu.boun.cmpe.scn.cli;
 import org.apache.karaf.shell.commands.Command;
 import org.apache.karaf.shell.console.OsgiCommandSupport;
 import org.onlab.osgi.DefaultServiceDirectory;
-import org.onosproject.cli.AbstractShellCommand;
-import tr.edu.boun.cmpe.scn.ScnService;
-import tr.edu.boun.cmpe.scn.ServiceInfo;
+import tr.edu.boun.cmpe.scn.api.common.ScnService;
+import tr.edu.boun.cmpe.scn.api.common.ServiceInfo;
 
 /**
  * Created by esinka on 1/6/2017.

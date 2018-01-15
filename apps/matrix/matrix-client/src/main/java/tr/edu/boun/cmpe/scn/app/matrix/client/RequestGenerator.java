@@ -62,6 +62,7 @@ public class RequestGenerator implements Runnable {
             scnClient = ScnClient.newInstance(Constants.SERVICE_NAME, address);
             boolean cont = true;
             int reqCount = 0;
+            ServiceInterest si = buildInterest();
             while (cont) {
                 try {
                     long sleepTime = (long) Poisson.sample(poissonMean);
@@ -72,10 +73,17 @@ public class RequestGenerator implements Runnable {
                         continue;
                     }
 
-                    System.out.println("Matrix:Sleeping for " + sleepTime + " seconds.");
+                    System.out.println("Matrix:Sleeping for " + sleepTime + " milli seconds.");
                     Thread.sleep(sleepTime);
 
-                    scnClient.send(buildInterest(), new ScnListener());
+                    si.setMessageId(generateMsgId());
+                    si.getArguments().getArgument().forEach(arg -> {
+                        if(arg.getName().equals(Constants.ARG_KEY)) {
+                            arg.setValue(String.valueOf(getRandomlyFromRange(dimensionStart, dimensionEnd)));
+                        }
+                    });
+
+                    scnClient.send(si, new ScnListener());
                     reqCount++;
 
                 } catch (InterruptedException | IOException e) {
